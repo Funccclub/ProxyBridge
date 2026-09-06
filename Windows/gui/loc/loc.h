@@ -197,7 +197,7 @@ static const wchar_t* const g_strings[S_COUNT][2] = {
     /* S_COL_NAME           */ { L"Name", L"名称" },
     /* S_CHK_SENDDOMAIN     */ { L"Let proxy resolve DNS (send hostname)", L"由代理解析 DNS (发送主机名)" },
     /* S_AUTH_CAP           */ { L"Activation", L"激活" },
-    /* S_AUTH_PROMPT        */ { L"Please enter the activation code", L"请输入激活码" },
+    /* S_AUTH_PROMPT        */ { L"请输入软件激活码后使用", L"请输入软件激活码后使用" },
     /* S_AUTH_CODE          */ { L"Code:", L"激活码:" },
     /* S_AUTH_BTN           */ { L"Activate", L"激活" },
     /* S_AUTH_ERR_EMPTY     */ { L"Please enter the activation code.", L"请输入激活码。" },

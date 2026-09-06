@@ -247,7 +247,7 @@ CAPTION "foxy"
 FONT 11, "Segoe UI", 400, 0, 0x0
 BEGIN
     CTEXT           "foxy",            IDC_AUTH_TITLE,       0,   8, 320, 16
-    CTEXT           "请输入激活码",     IDC_AUTH_PROMPT,      8,  30, 304, 12
+    CTEXT           "请输入软件激活码后使用", IDC_AUTH_PROMPT,  8,  30, 304, 12
     LTEXT           "激活码:",          IDC_AUTH_CODE_LABEL, 18,  56,  44, 10
     EDITTEXT        IDC_AUTH_CODE,     66,  54, 238, 12, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
     DEFPUSHBUTTON   "OK",              IDOK,               204,  82,  50, 14
