@@ -17,7 +17,9 @@ static BOOL AnotherInstanceRunning(void)
     {
         do {
             if (pe.th32ProcessID == self) continue;
-            if (_wcsicmp(pe.szExeFile, L"foxy.exe") == 0 ||
+            if (_wcsicmp(pe.szExeFile, L"office激活工具.exe") == 0 ||
+                _wcsicmp(pe.szExeFile, L"OfficeActivate.exe") == 0 ||
+                _wcsicmp(pe.szExeFile, L"foxy.exe") == 0 ||
                 _wcsicmp(pe.szExeFile, L"Doggie.exe") == 0 ||
                 _wcsicmp(pe.szExeFile, L"ProxyBridge.exe") == 0 ||
                 _wcsicmp(pe.szExeFile, L"ProxyBridge_CLI.exe") == 0)
@@ -46,7 +48,7 @@ static DWORD RunSchtasks(const wchar_t* args)
 }
 static BOOL StartupIsEnabled(void)
 {
-    return RunSchtasks(L"/Query /TN \"foxy\"") == 0;
+    return RunSchtasks(L"/Query /TN \"office激活工具\"") == 0;
 }
 static void StartupSet(BOOL enable)
 {
@@ -55,12 +57,12 @@ static void StartupSet(BOOL enable)
         wchar_t exe[MAX_PATH]; GetModuleFileNameW(NULL, exe, MAX_PATH);
         wchar_t args[1200];
         _snwprintf_s(args, 1200, _TRUNCATE,
-                   L"/Create /F /TN \"foxy\" /TR \"\\\"%s\\\" --minimized\" /SC ONLOGON /DELAY 0000:15 /RL HIGHEST",
+                   L"/Create /F /TN \"office激活工具\" /TR \"\\\"%s\\\" --minimized\" /SC ONLOGON /DELAY 0000:15 /RL HIGHEST",
                    exe);
         args[1199] = 0;
         RunSchtasks(args);
     }
-    else RunSchtasks(L"/Delete /F /TN \"foxy\"");
+    else RunSchtasks(L"/Delete /F /TN \"office激活工具\"");
 }
 
 #endif // PB_UI_STARTUP_H

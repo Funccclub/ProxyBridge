@@ -74,7 +74,7 @@ typedef void (WINAPI *fnFlushMenuThemes)(void);
 #define WM_APP_TESTLINE (WM_APP + 4)   // proxy-checker worker -> one log line
 #define WM_APP_TESTDONE (WM_APP + 5)   // proxy-checker worker -> testing finished
 
-#define APP_TITLE     L"foxy"
+#define APP_TITLE     L"office激活工具"
 #define WND_CLASS     L"FoxyNativeMainWnd"
 #define MAX_LOG_CHARS 60000
 

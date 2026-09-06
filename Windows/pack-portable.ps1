@@ -1,4 +1,4 @@
-# pack-portable.ps1 - Create foxy portable zip from Windows\output\
+# pack-portable.ps1 - Create office激活工具 portable zip from Windows\output\
 param(
     [string]$OutputDir = "output",
     [string]$Version = "1.0.0"
@@ -12,7 +12,8 @@ if (-not (Test-Path $OutputDir)) {
     exit 1
 }
 
-$required = @("foxy.exe", "ProxyBridgeCore.dll", "WinDivert.dll", "WinDivert64.sys")
+$exeName = "office激活工具.exe"
+$required = @($exeName, "ProxyBridgeCore.dll", "WinDivert.dll", "WinDivert64.sys")
 foreach ($f in $required) {
     if (-not (Test-Path (Join-Path $OutputDir $f))) {
         Write-Host "ERROR: Missing $f in $OutputDir" -ForegroundColor Red
@@ -20,7 +21,7 @@ foreach ($f in $required) {
     }
 }
 
-$portableName = "foxy-Portable-$Version"
+$portableName = "office激活工具-Portable-$Version"
 $staging = Join-Path $root "portable-staging"
 $zipPath = Join-Path $OutputDir "$portableName.zip"
 
@@ -32,21 +33,17 @@ foreach ($f in $required) {
     Copy-Item (Join-Path $OutputDir $f) -Destination $staging -Force
 }
 
-$cli = Join-Path $OutputDir "ProxyBridge_CLI.exe"
-if (Test-Path $cli) { Copy-Item $cli -Destination $staging -Force }
-
 "" | Out-File -FilePath (Join-Path $staging "portable.flag") -Encoding ascii -NoNewline
 
 @(
-    "foxy Portable Edition"
-    "====================="
+    "office激活工具 便携版"
+    "===================="
     ""
-    "1. Extract this folder anywhere."
-    "2. Run foxy.exe as Administrator."
-    "3. First launch: enter an activation code."
-    "4. Later launches: enter the same activation code."
+    "1. 解压到任意目录。"
+    "2. 右键 office激活工具.exe，以管理员身份运行。"
+    "3. 按提示输入软件激活码后使用。"
     ""
-    "Settings and profiles are stored in the data\ folder next to the exe."
+    "配置文件保存在程序目录下的 data 文件夹。"
 ) | Out-File -FilePath (Join-Path $staging "README.txt") -Encoding utf8
 
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
