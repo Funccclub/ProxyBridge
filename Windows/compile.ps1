@@ -232,6 +232,7 @@ if ($success) {
         } else {
             Write-Host "  C GUI build failed!" -ForegroundColor Red
             Write-Host $guiOut
+            exit 1
         }
     } else {
         Write-Host "  Skipped: MSVC not found" -ForegroundColor Yellow
@@ -297,44 +298,38 @@ if ($success) {
 
     Write-Host "`nBuilding installer..." -ForegroundColor Green
     $nsisPath = "C:\Program Files (x86)\NSIS\Bin\makensis.exe"
-    if (Test-Path $nsisPath) {
+    if ((Test-Path $nsisPath) -and (Test-Path "$OutputDir\Doggie.exe")) {
         Push-Location installer
-        $result = & $nsisPath "ProxyBridge.nsi" 2>&1
+        $result = & $nsisPath "Doggie.nsi" 2>&1
         Pop-Location
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  Installer created successfully" -ForegroundColor Green
-            # Derive installer name from the version defined in the NSI file
-            $nsiContent = Get-Content "installer\ProxyBridge.nsi" -Raw -ErrorAction SilentlyContinue
-            $installerVersion = if ($nsiContent -match '!define PRODUCT_VERSION "([^"]+)"') { $Matches[1] } else { "0.0.0" }
-            $installerName = "ProxyBridge-Setup-$installerVersion.exe"
+            $installerName = "Doggie-Setup-1.0.0.exe"
             if (Test-Path "installer\$installerName") {
                 Move-Item "installer\$installerName" -Destination $OutputDir -Force
                 Write-Host "  Moved: $installerName -> $OutputDir\" -ForegroundColor Gray
-
                 if (-not $NoSign) {
-                    Write-Host "`nSigning installer..." -ForegroundColor Green
-                    if (Sign-Binary -FilePath "$OutputDir\$installerName") {
-                        $installerSize = [math]::Round((Get-Item "$OutputDir\$installerName").Length/1MB, 2)
-                        Write-Host "  Installer ready: $OutputDir\$installerName ($installerSize MB)" -ForegroundColor Cyan
-                    }
-                } else {
-                    $installerSize = [math]::Round((Get-Item "$OutputDir\$installerName").Length/1MB, 2)
-                    Write-Host "  Installer ready: $OutputDir\$installerName ($installerSize MB)" -ForegroundColor Cyan
+                    Sign-Binary -FilePath "$OutputDir\$installerName" | Out-Null
                 }
             }
         } else {
-            Write-Host "  Installer build failed!" -ForegroundColor Red
+            Write-Host "  Installer build failed (non-fatal)!" -ForegroundColor Yellow
             Write-Host $result
         }
     } else {
-        Write-Host "  NSIS not found at: $nsisPath" -ForegroundColor Yellow
-        Write-Host "  Skipping installer creation" -ForegroundColor Yellow
+        Write-Host "  Skipping installer (NSIS or Doggie.exe not available)" -ForegroundColor Yellow
     }
 
     Write-Host "`nBuilding portable package..." -ForegroundColor Green
-    $packScript = Join-Path $PSScriptRoot "pack-portable.ps1"
-    if (Test-Path $packScript) {
-        & $packScript -OutputDir $OutputDir -Version "1.0.0"
+    if (Test-Path "$OutputDir\Doggie.exe") {
+        $packScript = Join-Path $PSScriptRoot "pack-portable.ps1"
+        if (Test-Path $packScript) {
+            & $packScript -OutputDir $OutputDir -Version "1.0.0"
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+        }
+    } else {
+        Write-Host "  ERROR: Doggie.exe missing, cannot build portable package" -ForegroundColor Red
+        exit 1
     }
 } else {
     Write-Host "`nCompilation FAILED!" -ForegroundColor Red

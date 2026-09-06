@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "auth.h"
+#include "../profile/profile.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -19,7 +20,6 @@ static wchar_t g_authPath[MAX_PATH];
 
 static void auth_path(wchar_t* out, int cch)
 {
-    extern void PB_GetDataDir(wchar_t* out, int cch);
     wchar_t base[MAX_PATH];
     PB_GetDataDir(base, MAX_PATH);
     _snwprintf_s(out, cch, _TRUNCATE, L"%s\\%s", base, AUTH_FILE);
@@ -27,7 +27,6 @@ static void auth_path(wchar_t* out, int cch)
 
 static BOOL ensure_data_dir(void)
 {
-    extern void PB_GetDataDir(wchar_t* out, int cch);
     wchar_t base[MAX_PATH];
     PB_GetDataDir(base, MAX_PATH);
     return CreateDirectoryW(base, NULL) || GetLastError() == ERROR_ALREADY_EXISTS;
