@@ -52,3 +52,4 @@ Remove-Item $staging -Recurse -Force
 
 $size = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
 Write-Host "Portable package ready: $zipPath ($size MB)" -ForegroundColor Green
+exit 0

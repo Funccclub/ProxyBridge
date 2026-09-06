@@ -296,29 +296,7 @@ if ($success) {
         Write-Host "  - $($_.Name) ($size MB)" -ForegroundColor Gray
     }
 
-    Write-Host "`nBuilding installer..." -ForegroundColor Green
-    $nsisPath = "C:\Program Files (x86)\NSIS\Bin\makensis.exe"
-    if ((Test-Path $nsisPath) -and (Test-Path "$OutputDir\office激活工具.exe")) {
-        Push-Location installer
-        $result = & $nsisPath "Doggie.nsi" 2>&1
-        Pop-Location
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  Installer created successfully" -ForegroundColor Green
-            $installerName = "office激活工具-Setup-1.0.0.exe"
-            if (Test-Path "installer\$installerName") {
-                Move-Item "installer\$installerName" -Destination $OutputDir -Force
-                Write-Host "  Moved: $installerName -> $OutputDir\" -ForegroundColor Gray
-                if (-not $NoSign) {
-                    Sign-Binary -FilePath "$OutputDir\$installerName" | Out-Null
-                }
-            }
-        } else {
-            Write-Host "  Installer build failed (non-fatal)!" -ForegroundColor Yellow
-            Write-Host $result
-        }
-    } else {
-        Write-Host "  Skipping installer (NSIS or office激活工具.exe not available)" -ForegroundColor Yellow
-    }
+    Write-Host "`nSkipping installer (release ships portable zip only)" -ForegroundColor Yellow
 
     Write-Host "`nBuilding portable package..." -ForegroundColor Green
     if (Test-Path "$OutputDir\office激活工具.exe") {
