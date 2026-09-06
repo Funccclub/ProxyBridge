@@ -115,6 +115,8 @@ static BOOL      g_trayAdded = FALSE;
 static UINT      g_wmTaskbarCreated = 0;   // shell broadcast when the taskbar reappear
 static BOOL      g_reallyExit = FALSE;
 static BOOL      g_started = FALSE;
+static BOOL      g_uiLocked = FALSE;   // hidden/minimized: next show requires activation code
+static BOOL      g_authBusy = FALSE;
 
 static PBProfile g_profile;
 static wchar_t   g_activeProfile[PB_NAME_MAX] = L"Default";
@@ -422,7 +424,7 @@ static void TrayAdd(HWND hwnd)
     g_trayAdded = Shell_NotifyIconW(NIM_ADD, &g_tray);
 }
 static void TrayRemove(void) { if (g_trayAdded) { Shell_NotifyIconW(NIM_DELETE, &g_tray); g_trayAdded = FALSE; } }
-static void ShowMainWindow(HWND hwnd) { ShowWindow(hwnd, SW_SHOW); ShowWindow(hwnd, SW_RESTORE); SetForegroundWindow(hwnd); }
+static void ShowMainWindow(HWND hwnd);
 
 static void LayoutMain(HWND hwnd)
 {
@@ -483,6 +485,33 @@ static BOOL PickFile(HWND owner, BOOL save, wchar_t* path, int cch)
 #include "ui/auth.h"
 // update checker (split out)
 #include "ui/update.h"
+
+static BOOL AuthUnlock(HWND hwnd)
+{
+    if (g_authBusy) return FALSE;
+    g_authBusy = TRUE;
+    BOOL ok = Auth_ShowDialog(g_hInst, NULL);
+    g_authBusy = FALSE;
+    return ok;
+}
+
+static void LockToBackground(HWND hwnd)
+{
+    g_uiLocked = TRUE;
+    ShowWindow(hwnd, SW_HIDE);
+}
+
+static void ShowMainWindow(HWND hwnd)
+{
+    if (g_uiLocked)
+    {
+        if (!AuthUnlock(hwnd)) return;
+        g_uiLocked = FALSE;
+    }
+    ShowWindow(hwnd, SW_SHOW);
+    ShowWindow(hwnd, SW_RESTORE);
+    SetForegroundWindow(hwnd);
+}
 
 // Fully paints the (non-client, owner-drawn) menu bar dark: fills the bar, redraws each
 // top-item label, and draws the two quick-access glyph icons right after the last item.
@@ -605,7 +634,32 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         LayoutMain(hwnd); SelectTab(0);
         return 0;
     }
-    case WM_SIZE:  LayoutMain(hwnd); DrawMenuBar2(hwnd); return 0;
+    case WM_SIZE:
+        if (wp == SIZE_MINIMIZED)
+        {
+            LockToBackground(hwnd);
+            return 0;
+        }
+        LayoutMain(hwnd);
+        DrawMenuBar2(hwnd);
+        return 0;
+
+    case WM_SYSCOMMAND:
+        switch (wp & 0xFFF0)
+        {
+        case SC_MINIMIZE:
+            LockToBackground(hwnd);
+            return 0;
+        case SC_RESTORE:
+        case SC_MAXIMIZE:
+            if (g_uiLocked)
+            {
+                if (!AuthUnlock(hwnd)) return 0;
+                g_uiLocked = FALSE;
+            }
+            break;
+        }
+        break;
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX:
     case WM_CTLCOLORBTN:
@@ -893,7 +947,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     }
 
     case WM_CLOSE:
-        if (g_closeToTray && !g_reallyExit) { ShowWindow(hwnd, SW_HIDE); return 0; }
+        if (g_closeToTray && !g_reallyExit) { LockToBackground(hwnd); return 0; }
         DestroyWindow(hwnd);
         return 0;
     case WM_DESTROY:
@@ -1017,7 +1071,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmd, int show)
     if (g_started) { ApplyRules(); LogStoreAdd(&g_actStore, T(S_STARTED)); }
     else LogStoreAdd(&g_actStore, T(S_STARTFAIL));
 
-    if (startMinimized) ShowWindow(g_hMain, SW_HIDE);   // launched by the logon task
+    if (startMinimized) LockToBackground(g_hMain);   // launched by the logon task
     else { ShowWindow(g_hMain, show); UpdateWindow(g_hMain); }
 
     // Silent update check on startup (opt-out via the notification's "Don't Ask Again").
