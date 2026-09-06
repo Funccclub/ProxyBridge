@@ -168,6 +168,6 @@
 #define IDC_AUTH_PASS              806
 #define IDC_AUTH_CONFIRM_LABEL     807
 #define IDC_AUTH_CONFIRM           808
-#define IDC_AUTH_SUBMIT            809
+#define IDC_AUTH_G_ACCOUNT         810
 
 #endif // RESOURCE_H

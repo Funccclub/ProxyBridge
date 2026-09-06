@@ -37,6 +37,9 @@ enum {
     S_M_UPDATE, S_UPD_TITLE, S_UPD_AVAIL, S_UPD_NOTES, S_UPD_NOW, S_UPD_LATER,
     S_UPD_DONTASK, S_UPD_LATEST, S_UPD_ERR, S_UPD_DLING, S_UPD_DLFAIL,
     S_L_NAME, S_COL_NAME, S_CHK_SENDDOMAIN,
+    S_AUTH_SIGNUP_CAP, S_AUTH_SIGNIN_CAP, S_AUTH_SIGNUP_SUB, S_AUTH_SIGNIN_SUB,
+    S_AUTH_GROUP, S_AUTH_EMAIL, S_AUTH_CONFIRM, S_AUTH_SIGNUP_BTN, S_AUTH_SIGNIN_BTN,
+    S_AUTH_ERR_PASS, S_AUTH_ERR_MATCH, S_AUTH_ERR_SHORT, S_AUTH_ERR_SAVE, S_AUTH_ERR_BAD,
     S_COUNT
 };
 
@@ -194,6 +197,20 @@ static const wchar_t* const g_strings[S_COUNT][2] = {
     /* S_L_NAME             */ { L"Name:", L"名称:" },
     /* S_COL_NAME           */ { L"Name", L"名称" },
     /* S_CHK_SENDDOMAIN     */ { L"Let proxy resolve DNS (send hostname)", L"由代理解析 DNS (发送主机名)" },
+    /* S_AUTH_SIGNUP_CAP    */ { L"Create Account", L"创建账户" },
+    /* S_AUTH_SIGNIN_CAP    */ { L"Sign In", L"登录" },
+    /* S_AUTH_SIGNUP_SUB    */ { L"Set a password to protect this installation.", L"设置密码以保护此安装。" },
+    /* S_AUTH_SIGNIN_SUB    */ { L"Enter your password to continue.", L"输入密码以继续。" },
+    /* S_AUTH_GROUP         */ { L"Account", L"账户" },
+    /* S_AUTH_EMAIL         */ { L"Email:", L"邮箱:" },
+    /* S_AUTH_CONFIRM       */ { L"Confirm:", L"确认:" },
+    /* S_AUTH_SIGNUP_BTN    */ { L"Sign Up", L"注册" },
+    /* S_AUTH_SIGNIN_BTN    */ { L"Sign In", L"登录" },
+    /* S_AUTH_ERR_PASS      */ { L"Please enter your password.", L"请输入密码。" },
+    /* S_AUTH_ERR_MATCH     */ { L"Passwords do not match.", L"两次密码不一致。" },
+    /* S_AUTH_ERR_SHORT     */ { L"Password must be at least 4 characters.", L"密码至少需要 4 个字符。" },
+    /* S_AUTH_ERR_SAVE      */ { L"Could not save your account.", L"无法保存账户信息。" },
+    /* S_AUTH_ERR_BAD       */ { L"Incorrect password. Please try again.", L"密码错误，请重试。" },
 };
 
 static const wchar_t* T(int id) { return g_strings[id][g_lang ? 1 : 0]; }

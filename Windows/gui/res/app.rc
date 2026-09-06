@@ -240,19 +240,21 @@ BEGIN
     DEFPUSHBUTTON   "Close",        IDCANCEL,       99, 146, 52, 16
 END
 
-// Auth gate (disguised as sign-up / sign-in)
-IDD_AUTH DIALOGEX 0, 0, 360, 240
+// Auth gate (ProxyBridge-style dialog, disguised as sign-up / sign-in)
+IDD_AUTH DIALOGEX 0, 0, 320, 168
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Doggie"
 FONT 11, "Segoe UI", 400, 0, 0x0
 BEGIN
-    CTEXT           "Create your account", IDC_AUTH_TITLE,    20,  16, 320, 20
-    CTEXT           "Sign up to get started", IDC_AUTH_SUBTITLE, 20,  38, 320, 14
-    LTEXT           "Email",         IDC_AUTH_EMAIL_LABEL,   28,  68, 304, 10
-    EDITTEXT        IDC_AUTH_EMAIL,  28,  82, 304, 14, ES_AUTOHSCROLL | WS_TABSTOP
-    LTEXT           "Password",      IDC_AUTH_PASS_LABEL,    28, 106, 304, 10
-    EDITTEXT        IDC_AUTH_PASS,   28, 120, 304, 14, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
-    LTEXT           "Confirm Password", IDC_AUTH_CONFIRM_LABEL, 28, 144, 304, 10
-    EDITTEXT        IDC_AUTH_CONFIRM,28, 158, 304, 14, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
-    DEFPUSHBUTTON   "Sign Up",       IDC_AUTH_SUBMIT,       28, 192, 304, 24
+    CTEXT           "Doggie",          IDC_AUTH_TITLE,         0,   8, 320, 16
+    LTEXT           "",                IDC_AUTH_SUBTITLE,      8,  26, 304, 10
+    GROUPBOX        "Account",         IDC_AUTH_G_ACCOUNT,     8,  40, 304, 88
+    LTEXT           "Email:",          IDC_AUTH_EMAIL_LABEL,  18,  56,  44, 10
+    EDITTEXT        IDC_AUTH_EMAIL,    66,  54, 238, 12, ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT           "Password:",       IDC_AUTH_PASS_LABEL,   18,  74,  44, 10
+    EDITTEXT        IDC_AUTH_PASS,     66,  72, 238, 12, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+    LTEXT           "Confirm:",        IDC_AUTH_CONFIRM_LABEL,18,  92,  44, 10
+    EDITTEXT        IDC_AUTH_CONFIRM,  66,  90, 238, 12, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+    DEFPUSHBUTTON   "Sign Up",         IDOK,                 204, 136,  50, 14
+    PUSHBUTTON      "Cancel",          IDCANCEL,             262, 136,  50, 14
 END
