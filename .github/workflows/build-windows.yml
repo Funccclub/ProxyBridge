@@ -2,9 +2,9 @@ name: Build Windows
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, master, dev ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, master, dev ]
   workflow_dispatch:
 
 permissions:
@@ -75,7 +75,7 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
-        name: ProxyBridge-Build-${{ github.sha }}
+        name: Doggie-Build-${{ github.sha }}
         path: Windows/output/
         retention-days: 30
 

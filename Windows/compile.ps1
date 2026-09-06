@@ -210,11 +210,11 @@ if ($success) {
         # /guard:cf (CFG), /CETCOMPAT (shadow-stack), /LTCG, dead-code strip.
         $guiClArgs = "/nologo /utf-8 /O1 /Os /MT /GL /Gy /GS /guard:cf /sdl /W4 " +
                      "/DNDEBUG /D_CRT_SECURE_NO_WARNINGS /DUNICODE /D_UNICODE " +
-                     "main.c profile\profile.c app.res " +
-                     "/Fe:ProxyBridge.exe " +
+                     "main.c profile\profile.c auth\auth.c app.res " +
+                     "/Fe:Doggie.exe " +
                      "/link /LTCG /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /RELEASE " +
                      "/DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /guard:cf /CETCOMPAT " +
-                     "user32.lib gdi32.lib comctl32.lib shell32.lib comdlg32.lib winhttp.lib"
+                     "user32.lib gdi32.lib comctl32.lib shell32.lib comdlg32.lib winhttp.lib bcrypt.lib"
 
         # Sources live in subfolders. rc runs from res\ so app.rc's relative paths
         # (resource.h, app.manifest, logo.ico) resolve; it writes app.res back to gui\.
@@ -225,9 +225,9 @@ if ($success) {
         $guiExit = $LASTEXITCODE
         Pop-Location
 
-        if ($guiExit -eq 0 -and (Test-Path "gui\ProxyBridge.exe")) {
-            Move-Item "gui\ProxyBridge.exe" -Destination $OutputDir -Force
-            Write-Host "  C GUI built: ProxyBridge.exe" -ForegroundColor Gray
+        if ($guiExit -eq 0 -and (Test-Path "gui\Doggie.exe")) {
+            Move-Item "gui\Doggie.exe" -Destination $OutputDir -Force
+            Write-Host "  C GUI built: Doggie.exe" -ForegroundColor Gray
             Remove-Item "gui\*.obj","gui\app.res" -Force -ErrorAction SilentlyContinue
         } else {
             Write-Host "  C GUI build failed!" -ForegroundColor Red
@@ -329,6 +329,12 @@ if ($success) {
     } else {
         Write-Host "  NSIS not found at: $nsisPath" -ForegroundColor Yellow
         Write-Host "  Skipping installer creation" -ForegroundColor Yellow
+    }
+
+    Write-Host "`nBuilding portable package..." -ForegroundColor Green
+    $packScript = Join-Path $PSScriptRoot "pack-portable.ps1"
+    if (Test-Path $packScript) {
+        & $packScript -OutputDir $OutputDir -Version "1.0.0"
     }
 } else {
     Write-Host "`nCompilation FAILED!" -ForegroundColor Red

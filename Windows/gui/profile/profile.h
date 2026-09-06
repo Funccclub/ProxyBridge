@@ -1,8 +1,9 @@
 // profile.h - read/write settings.json + *.pbprofile.
 //
-// Storage:
-//   %APPDATA%\ProxyBridge\settings.json               -> { ActiveProfileName, ... }
-//   %APPDATA%\ProxyBridge\profiles\<name>.pbprofile   -> ProxyProfile (PascalCase JSON)
+// Storage (portable):
+//   <exe>\data\settings.json               -> { ActiveProfileName, ... }
+//   <exe>\data\profiles\<name>.pbprofile   -> ProxyProfile (PascalCase JSON)
+//   <exe>\data\auth.dat                    -> password hash (PBKDF2)
 //
 // The in-memory struct holds every profile field - including LogFilters, which have no
 // editor yet but are round-tripped verbatim so nothing is lost on save.
@@ -58,6 +59,8 @@ typedef struct {
 } PBProfile;
 
 // settings.json (active profile pointer). Other settings fields are preserved on write.
+void PB_InitStorage(void);
+void PB_GetDataDir(wchar_t* out, int cch);
 void PB_GetActiveProfile(wchar_t* out, int cch);
 void PB_SetActiveProfile(const wchar_t* name);
 

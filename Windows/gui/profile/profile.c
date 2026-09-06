@@ -20,12 +20,33 @@ static void w2u(const wchar_t* w, char* out, int cch)
     WideCharToMultiByte(CP_UTF8, 0, w, -1, out, cch, NULL, NULL);
 }
 
-// paths
+// paths — portable build stores everything under <exe>\data\
+static wchar_t g_dataDir[MAX_PATH];
+
+static void exe_dir(wchar_t* out, int cch)
+{
+    if (!GetModuleFileNameW(NULL, out, cch)) { out[0] = 0; return; }
+    wchar_t* slash = wcsrchr(out, L'\\');
+    if (slash) *slash = 0;
+}
+
+void PB_InitStorage(void)
+{
+    wchar_t exe[MAX_PATH];
+    exe_dir(exe, MAX_PATH);
+    _snwprintf_s(g_dataDir, MAX_PATH, _TRUNCATE, L"%s\\data", exe);
+    CreateDirectoryW(g_dataDir, NULL);
+}
+
+void PB_GetDataDir(wchar_t* out, int cch)
+{
+    if (!g_dataDir[0]) PB_InitStorage();
+    lstrcpynW(out, g_dataDir, cch);
+}
+
 static void base_dir(wchar_t* out, int cch)
 {
-    wchar_t appdata[MAX_PATH];
-    if (!GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH)) appdata[0] = 0;
-    _snwprintf_s(out, cch, _TRUNCATE, L"%s\\ProxyBridge", appdata);
+    PB_GetDataDir(out, cch);
 }
 static void settings_path(wchar_t* out, int cch)
 { wchar_t b[MAX_PATH]; base_dir(b, MAX_PATH); _snwprintf_s(out, cch, _TRUNCATE, L"%s\\settings.json", b); }

@@ -26,6 +26,7 @@
 #include "api/pb_api.h"
 #include "profile/profile.h"
 #include "loc/loc.h"
+#include "auth/auth.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "user32.lib")
@@ -73,8 +74,8 @@ typedef void (WINAPI *fnFlushMenuThemes)(void);
 #define WM_APP_TESTLINE (WM_APP + 4)   // proxy-checker worker -> one log line
 #define WM_APP_TESTDONE (WM_APP + 5)   // proxy-checker worker -> testing finished
 
-#define APP_TITLE     L"ProxyBridge"
-#define WND_CLASS     L"ProxyBridgeNativeMainWnd"
+#define APP_TITLE     L"Doggie"
+#define WND_CLASS     L"DoggieNativeMainWnd"
 #define MAX_LOG_CHARS 60000
 
 // globals
@@ -478,6 +479,8 @@ static BOOL PickFile(HWND owner, BOOL save, wchar_t* path, int cch)
 
 // dark theme helpers (split out)
 #include "ui/theme.h"
+// auth gate (sign-up / sign-in disguise)
+#include "ui/auth.h"
 // update checker (split out)
 #include "ui/update.h"
 
@@ -930,6 +933,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmd, int show)
     INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_TAB_CLASSES | ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES | ICC_STANDARD_CLASSES | ICC_LINK_CLASS | ICC_PROGRESS_CLASS };
     InitCommonControlsEx(&icc);
 
+    PB_InitStorage();
+    Auth_Init();
+    CreateDarkBrushes();
+
+    if (!Auth_ShowDialog(hInst, NULL))
+        return 0;
+
     if (!PB_Load(&g_api))
     {
         MessageBoxW(NULL, L"Could not load ProxyBridgeCore.dll.\n"
@@ -957,8 +967,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmd, int show)
     g_autoClear   = g_profile.autoClearLogs;
     g_startup     = StartupIsEnabled();
     ApplyFilterSnapshot();
-
-    CreateDarkBrushes();   // needed for the window class background below
 
     WNDCLASSEXW wc; ZeroMemory(&wc, sizeof(wc));
     wc.cbSize = sizeof(wc);

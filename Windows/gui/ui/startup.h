@@ -17,7 +17,8 @@ static BOOL AnotherInstanceRunning(void)
     {
         do {
             if (pe.th32ProcessID == self) continue;
-            if (_wcsicmp(pe.szExeFile, L"ProxyBridge.exe") == 0 ||
+            if (_wcsicmp(pe.szExeFile, L"Doggie.exe") == 0 ||
+                _wcsicmp(pe.szExeFile, L"ProxyBridge.exe") == 0 ||
                 _wcsicmp(pe.szExeFile, L"ProxyBridge_CLI.exe") == 0)
             { found = TRUE; break; }
         } while (Process32NextW(snap, &pe));
@@ -44,7 +45,7 @@ static DWORD RunSchtasks(const wchar_t* args)
 }
 static BOOL StartupIsEnabled(void)
 {
-    return RunSchtasks(L"/Query /TN \"ProxyBridge\"") == 0;
+    return RunSchtasks(L"/Query /TN \"Doggie\"") == 0;
 }
 static void StartupSet(BOOL enable)
 {
@@ -52,15 +53,13 @@ static void StartupSet(BOOL enable)
     {
         wchar_t exe[MAX_PATH]; GetModuleFileNameW(NULL, exe, MAX_PATH);
         wchar_t args[1200];
-        // ONLOGON task launching the exe minimized, highest run level.
-        // The short delay lets the shell/tray come up first so the tray icon appears
         _snwprintf_s(args, 1200, _TRUNCATE,
-                   L"/Create /F /TN \"ProxyBridge\" /TR \"\\\"%s\\\" --minimized\" /SC ONLOGON /DELAY 0000:15 /RL HIGHEST",
+                   L"/Create /F /TN \"Doggie\" /TR \"\\\"%s\\\" --minimized\" /SC ONLOGON /DELAY 0000:15 /RL HIGHEST",
                    exe);
         args[1199] = 0;
         RunSchtasks(args);
     }
-    else RunSchtasks(L"/Delete /F /TN \"ProxyBridge\"");
+    else RunSchtasks(L"/Delete /F /TN \"Doggie\"");
 }
 
 #endif // PB_UI_STARTUP_H
