@@ -20,7 +20,7 @@ static void w2u(const wchar_t* w, char* out, int cch)
     WideCharToMultiByte(CP_UTF8, 0, w, -1, out, cch, NULL, NULL);
 }
 
-// paths — portable build stores everything under <exe>\data\
+// paths - portable build stores everything under exe/data/
 static wchar_t g_dataDir[MAX_PATH];
 
 static void exe_dir(wchar_t* out, int cch)
