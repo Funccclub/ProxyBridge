@@ -38,14 +38,15 @@ static BOOL b64_encode(const BYTE* in, DWORD inLen, char* out, int outCch)
     DWORD i = 0, o = 0;
     while (i < inLen)
     {
+        DWORD remain = inLen - i;
         DWORD a = in[i++];
-        DWORD b = (i < inLen) ? in[i++] : 0;
-        DWORD c = (i < inLen) ? in[i++] : 0;
+        DWORD b = (remain > 1) ? in[i++] : 0;
+        DWORD c = (remain > 2) ? in[i++] : 0;
         if (o + 4 >= (DWORD)outCch) return FALSE;
         out[o++] = tbl[(a >> 2) & 0x3F];
         out[o++] = tbl[((a << 4) | (b >> 4)) & 0x3F];
-        out[o++] = (i > inLen + 1) ? '=' : tbl[((b << 2) | (c >> 6)) & 0x3F];
-        out[o++] = (i > inLen) ? '=' : tbl[c & 0x3F];
+        out[o++] = (remain < 2) ? '=' : tbl[((b << 2) | (c >> 6)) & 0x3F];
+        out[o++] = (remain < 3) ? '=' : tbl[c & 0x3F];
     }
     if (o < (DWORD)outCch) out[o] = 0;
     return TRUE;
@@ -124,9 +125,27 @@ static const char* json_str(const char* json, const char* key, char* out, int ou
     return out;
 }
 
+static BOOL auth_file_readable(void)
+{
+    char json[512];
+    char saltB64[64], hashB64[64];
+    BYTE salt[AUTH_SALT_BYTES], hash[AUTH_HASH_BYTES];
+    DWORD saltLen = 0, hashLen = 0;
+    if (!read_auth_file(json, sizeof(json))) return FALSE;
+    if (!json_str(json, "salt", saltB64, sizeof(saltB64))) return FALSE;
+    if (!json_str(json, "hash", hashB64, sizeof(hashB64))) return FALSE;
+    if (!b64_decode(saltB64, salt, &saltLen) || saltLen != AUTH_SALT_BYTES) return FALSE;
+    if (!b64_decode(hashB64, hash, &hashLen) || hashLen != AUTH_HASH_BYTES) return FALSE;
+    return TRUE;
+}
+
 void Auth_Init(void)
 {
     auth_path(g_authPath, MAX_PATH);
+    // Old builds wrote unpadded base64, so later unlocks always failed. Drop the bad file
+    // so the next successful unlock can store a correct hash.
+    if (Auth_HasPassword() && !auth_file_readable())
+        DeleteFileW(g_authPath);
 }
 
 BOOL Auth_HasPassword(void)
