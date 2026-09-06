@@ -1,4 +1,4 @@
-// auth.c - PBKDF2-SHA256 password storage for the portable Doggie build.
+// auth.c - PBKDF2-SHA256 password storage for the portable ProxyBridge build.
 #ifndef UNICODE
 #define UNICODE
 #endif

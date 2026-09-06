@@ -158,16 +158,11 @@
 #define IDC_AB_GITHUB              706
 #define IDC_AB_LICENSE             707
 
-// Auth gate (sign-up / sign-in disguise)
+// Auth gate (activation code)
 #define IDD_AUTH                   800
 #define IDC_AUTH_TITLE             801
-#define IDC_AUTH_SUBTITLE          802
-#define IDC_AUTH_EMAIL_LABEL       803
-#define IDC_AUTH_EMAIL             804
-#define IDC_AUTH_PASS_LABEL        805
-#define IDC_AUTH_PASS              806
-#define IDC_AUTH_CONFIRM_LABEL     807
-#define IDC_AUTH_CONFIRM           808
-#define IDC_AUTH_G_ACCOUNT         810
+#define IDC_AUTH_PROMPT            802
+#define IDC_AUTH_CODE_LABEL        803
+#define IDC_AUTH_CODE              804
 
 #endif // RESOURCE_H

@@ -1,4 +1,4 @@
-# pack-portable.ps1 - Create Doggie portable zip from Windows\output\
+# pack-portable.ps1 - Create foxy portable zip from Windows\output\
 param(
     [string]$OutputDir = "output",
     [string]$Version = "1.0.0"
@@ -12,7 +12,7 @@ if (-not (Test-Path $OutputDir)) {
     exit 1
 }
 
-$required = @("Doggie.exe", "ProxyBridgeCore.dll", "WinDivert.dll", "WinDivert64.sys")
+$required = @("foxy.exe", "ProxyBridgeCore.dll", "WinDivert.dll", "WinDivert64.sys")
 foreach ($f in $required) {
     if (-not (Test-Path (Join-Path $OutputDir $f))) {
         Write-Host "ERROR: Missing $f in $OutputDir" -ForegroundColor Red
@@ -20,7 +20,7 @@ foreach ($f in $required) {
     }
 }
 
-$portableName = "Doggie-Portable-$Version"
+$portableName = "foxy-Portable-$Version"
 $staging = Join-Path $root "portable-staging"
 $zipPath = Join-Path $OutputDir "$portableName.zip"
 
@@ -38,13 +38,13 @@ if (Test-Path $cli) { Copy-Item $cli -Destination $staging -Force }
 "" | Out-File -FilePath (Join-Path $staging "portable.flag") -Encoding ascii -NoNewline
 
 @(
-    "Doggie Portable Edition"
-    "========================"
+    "foxy Portable Edition"
+    "====================="
     ""
     "1. Extract this folder anywhere."
-    "2. Run Doggie.exe as Administrator."
-    "3. First launch: Sign Up to set your password."
-    "4. Later launches: Sign In with your password."
+    "2. Run foxy.exe as Administrator."
+    "3. First launch: enter an activation code."
+    "4. Later launches: enter the same activation code."
     ""
     "Settings and profiles are stored in the data\ folder next to the exe."
 ) | Out-File -FilePath (Join-Path $staging "README.txt") -Encoding utf8

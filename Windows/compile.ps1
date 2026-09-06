@@ -211,7 +211,7 @@ if ($success) {
         $guiClArgs = "/nologo /utf-8 /O1 /Os /MT /GL /Gy /GS /guard:cf /sdl /W4 " +
                      "/DNDEBUG /D_CRT_SECURE_NO_WARNINGS /DUNICODE /D_UNICODE " +
                      "main.c profile\profile.c auth\auth.c app.res " +
-                     "/Fe:Doggie.exe " +
+                     "/Fe:foxy.exe " +
                      "/link /LTCG /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /RELEASE " +
                      "/DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /guard:cf /CETCOMPAT " +
                      "user32.lib gdi32.lib comctl32.lib shell32.lib comdlg32.lib winhttp.lib bcrypt.lib"
@@ -225,9 +225,9 @@ if ($success) {
         $guiExit = $LASTEXITCODE
         Pop-Location
 
-        if ($guiExit -eq 0 -and (Test-Path "gui\Doggie.exe")) {
-            Move-Item "gui\Doggie.exe" -Destination $OutputDir -Force
-            Write-Host "  C GUI built: Doggie.exe" -ForegroundColor Gray
+        if ($guiExit -eq 0 -and (Test-Path "gui\foxy.exe")) {
+            Move-Item "gui\foxy.exe" -Destination $OutputDir -Force
+            Write-Host "  C GUI built: foxy.exe" -ForegroundColor Gray
             Remove-Item "gui\*.obj","gui\app.res" -Force -ErrorAction SilentlyContinue
         } else {
             Write-Host "  C GUI build failed!" -ForegroundColor Red
@@ -298,13 +298,13 @@ if ($success) {
 
     Write-Host "`nBuilding installer..." -ForegroundColor Green
     $nsisPath = "C:\Program Files (x86)\NSIS\Bin\makensis.exe"
-    if ((Test-Path $nsisPath) -and (Test-Path "$OutputDir\Doggie.exe")) {
+    if ((Test-Path $nsisPath) -and (Test-Path "$OutputDir\foxy.exe")) {
         Push-Location installer
         $result = & $nsisPath "Doggie.nsi" 2>&1
         Pop-Location
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  Installer created successfully" -ForegroundColor Green
-            $installerName = "Doggie-Setup-1.0.0.exe"
+            $installerName = "foxy-Setup-1.0.0.exe"
             if (Test-Path "installer\$installerName") {
                 Move-Item "installer\$installerName" -Destination $OutputDir -Force
                 Write-Host "  Moved: $installerName -> $OutputDir\" -ForegroundColor Gray
@@ -317,18 +317,18 @@ if ($success) {
             Write-Host $result
         }
     } else {
-        Write-Host "  Skipping installer (NSIS or Doggie.exe not available)" -ForegroundColor Yellow
+        Write-Host "  Skipping installer (NSIS or foxy.exe not available)" -ForegroundColor Yellow
     }
 
     Write-Host "`nBuilding portable package..." -ForegroundColor Green
-    if (Test-Path "$OutputDir\Doggie.exe") {
+    if (Test-Path "$OutputDir\foxy.exe") {
         $packScript = Join-Path $PSScriptRoot "pack-portable.ps1"
         if (Test-Path $packScript) {
             & $packScript -OutputDir $OutputDir -Version "1.0.0"
             if ($LASTEXITCODE -ne 0) { exit 1 }
         }
     } else {
-        Write-Host "  ERROR: Doggie.exe missing, cannot build portable package" -ForegroundColor Red
+        Write-Host "  ERROR: foxy.exe missing, cannot build portable package" -ForegroundColor Red
         exit 1
     }
 } else {

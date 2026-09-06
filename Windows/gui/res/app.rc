@@ -21,15 +21,15 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName",      "Doggie"
-            VALUE "FileDescription",  "Doggie"
+            VALUE "CompanyName",      "foxy"
+            VALUE "FileDescription",  "foxy"
             VALUE "Comments",         "Universal proxy client for Windows applications"
             VALUE "FileVersion",      PB_VER_STR
-            VALUE "InternalName",     "Doggie"
-            VALUE "OriginalFilename", "Doggie.exe"
-            VALUE "ProductName",      "Doggie"
+            VALUE "InternalName",     "foxy"
+            VALUE "OriginalFilename", "foxy.exe"
+            VALUE "ProductName",      "foxy"
             VALUE "ProductVersion",   PB_VER_STR
-            VALUE "LegalCopyright",   "Copyright (c) 2026 Doggie"
+            VALUE "LegalCopyright",   "Copyright (c) 2026 foxy"
         END
     END
     BLOCK "VarFileInfo"
@@ -227,10 +227,10 @@ END
 // About dialog
 IDD_ABOUT DIALOGEX 0, 0, 250, 170
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "About Doggie"
+CAPTION "About foxy"
 FONT 11, "Segoe UI", 400, 0, 0x0
 BEGIN
-    CTEXT           "Doggie",  IDC_AB_TITLE,    0,  12, 250, 18
+    CTEXT           "foxy",  IDC_AB_TITLE,    0,  12, 250, 18
     CTEXT           "",             IDC_AB_VER,      0,  33, 250, 11
     CTEXT           "",             IDC_AB_DESC,     6,  50, 238, 11
     CTEXT           "",             IDC_AB_AUTHOR,   0,  67, 250, 11
@@ -240,21 +240,16 @@ BEGIN
     DEFPUSHBUTTON   "Close",        IDCANCEL,       99, 146, 52, 16
 END
 
-// Auth gate (ProxyBridge-style dialog, disguised as sign-up / sign-in)
-IDD_AUTH DIALOGEX 0, 0, 320, 168
+// Auth gate: password check presented as an activation-code dialog.
+IDD_AUTH DIALOGEX 0, 0, 320, 108
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "Doggie"
+CAPTION "foxy"
 FONT 11, "Segoe UI", 400, 0, 0x0
 BEGIN
-    CTEXT           "Doggie",          IDC_AUTH_TITLE,         0,   8, 320, 16
-    LTEXT           "",                IDC_AUTH_SUBTITLE,      8,  26, 304, 10
-    GROUPBOX        "Account",         IDC_AUTH_G_ACCOUNT,     8,  40, 304, 88
-    LTEXT           "Email:",          IDC_AUTH_EMAIL_LABEL,  18,  56,  44, 10
-    EDITTEXT        IDC_AUTH_EMAIL,    66,  54, 238, 12, ES_AUTOHSCROLL | WS_TABSTOP
-    LTEXT           "Password:",       IDC_AUTH_PASS_LABEL,   18,  74,  44, 10
-    EDITTEXT        IDC_AUTH_PASS,     66,  72, 238, 12, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
-    LTEXT           "Confirm:",        IDC_AUTH_CONFIRM_LABEL,18,  92,  44, 10
-    EDITTEXT        IDC_AUTH_CONFIRM,  66,  90, 238, 12, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
-    DEFPUSHBUTTON   "Sign Up",         IDOK,                 204, 136,  50, 14
-    PUSHBUTTON      "Cancel",          IDCANCEL,             262, 136,  50, 14
+    CTEXT           "foxy",            IDC_AUTH_TITLE,       0,   8, 320, 16
+    CTEXT           "请输入激活码",     IDC_AUTH_PROMPT,      8,  30, 304, 12
+    LTEXT           "激活码:",          IDC_AUTH_CODE_LABEL, 18,  56,  44, 10
+    EDITTEXT        IDC_AUTH_CODE,     66,  54, 238, 12, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",              IDOK,               204,  82,  50, 14
+    PUSHBUTTON      "Cancel",          IDCANCEL,           262,  82,  50, 14
 END

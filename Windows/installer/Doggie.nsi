@@ -1,6 +1,6 @@
-!define PRODUCT_NAME "Doggie"
+!define PRODUCT_NAME "foxy"
 !define PRODUCT_VERSION "1.0.0"
-!define PRODUCT_PUBLISHER "Doggie"
+!define PRODUCT_PUBLISHER "foxy"
 !define PRODUCT_WEB_SITE "https://github.com/Funccclub/ProxyBridge"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
@@ -21,7 +21,7 @@ SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "Doggie-Setup-${PRODUCT_VERSION}.exe"
+OutFile "foxy-Setup-${PRODUCT_VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_UNINST_KEY}" "InstallLocation"
 RequestExecutionLevel admin
@@ -35,8 +35,8 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
-!define MUI_FINISHPAGE_RUN "$INSTDIR\Doggie.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Run Doggie now"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\foxy.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Run foxy now"
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -45,15 +45,15 @@ RequestExecutionLevel admin
 !insertmacro MUI_LANGUAGE "English"
 
 Section "MainSection" SEC01
-  nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq Doggie.exe" /NH | findstr /I "Doggie.exe"'
+  nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq foxy.exe" /NH | findstr /I "foxy.exe"'
   Pop $0
   Pop $1
   StrCmp $0 "0" 0 install_proceed
-    MessageBox MB_YESNO|MB_ICONQUESTION "Doggie is currently running and must be closed to continue.$\n$\nClose Doggie now?" IDYES install_kill IDNO install_abort
+    MessageBox MB_YESNO|MB_ICONQUESTION "foxy is currently running and must be closed to continue.$\n$\nClose foxy now?" IDYES install_kill IDNO install_abort
     install_abort:
       Quit
     install_kill:
-      nsExec::ExecToLog 'taskkill /F /IM Doggie.exe'
+      nsExec::ExecToLog 'taskkill /F /IM foxy.exe'
       nsExec::ExecToLog 'taskkill /F /IM ProxyBridge_CLI.exe'
       Sleep 1500
   install_proceed:
@@ -66,14 +66,14 @@ Section "MainSection" SEC01
   SetOutPath "$INSTDIR"
   SetOverwrite on
 
-  File "..\output\Doggie.exe"
+  File "..\output\foxy.exe"
   File "..\output\ProxyBridgeCore.dll"
   File "..\output\WinDivert.dll"
   File "..\output\WinDivert64.sys"
 
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\Doggie.exe"
-  CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\Doggie.exe"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\foxy.exe"
+  CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\foxy.exe"
 
   EnVar::SetHKLM
   EnVar::AddValue "PATH" "$INSTDIR"
@@ -85,7 +85,7 @@ Section -Post
   WriteUninstaller "$INSTDIR\uninst.exe"
   WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayName" "$(^Name)"
   WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
-  WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\Doggie.exe"
+  WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\foxy.exe"
   WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
   WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
@@ -93,23 +93,23 @@ Section -Post
 SectionEnd
 
 Section Uninstall
-  nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq Doggie.exe" /NH | findstr /I "Doggie.exe"'
+  nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq foxy.exe" /NH | findstr /I "foxy.exe"'
   Pop $0
   Pop $1
   StrCmp $0 "0" 0 uninst_proceed
-    MessageBox MB_YESNO|MB_ICONQUESTION "Doggie is currently running.$\n$\nClose it and continue?" IDYES uninst_kill IDNO uninst_proceed
+    MessageBox MB_YESNO|MB_ICONQUESTION "foxy is currently running.$\n$\nClose it and continue?" IDYES uninst_kill IDNO uninst_proceed
     uninst_kill:
-      nsExec::ExecToLog 'taskkill /F /IM Doggie.exe'
+      nsExec::ExecToLog 'taskkill /F /IM foxy.exe'
       Sleep 1500
   uninst_proceed:
 
-  nsExec::ExecToLog 'schtasks /Delete /F /TN "Doggie"'
+  nsExec::ExecToLog 'schtasks /Delete /F /TN "foxy"'
   nsExec::ExecToLog 'sc stop WinDivert'
   nsExec::ExecToLog 'sc delete WinDivert'
   DeleteRegKey HKLM "SYSTEM\CurrentControlSet\Services\WinDivert"
   Sleep 500
 
-  Delete "$INSTDIR\Doggie.exe"
+  Delete "$INSTDIR\foxy.exe"
   Delete "$INSTDIR\ProxyBridgeCore.dll"
   Delete "$INSTDIR\WinDivert.dll"
   Delete "$INSTDIR\WinDivert64.sys"
