@@ -198,7 +198,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmd, int show)
     g_dlg = CreateDialogParamW(hInst, MAKEINTRESOURCEW(IDD_ABOUT), NULL, AboutDlgProc, 0);
     CHECK(g_dlg != NULL);
     { wchar_t t[256]; Get(IDC_AB_VER, t, 256); CHECK(wcsstr(t, PB_VER_STRW) != NULL);                    /* shows the real version */
-      Get(IDC_AB_TITLE, t, 256); CHECK(wcsstr(t, L"ProxyBridge") != NULL);
+      Get(IDC_AB_TITLE, t, 256); CHECK(wcsstr(t, APP_TITLE) != NULL);
       DestroyWindow(g_dlg); }
 
     return pbtest_done("test_dialogs_ui");
