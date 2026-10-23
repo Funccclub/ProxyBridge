@@ -175,16 +175,16 @@
 #define IDC_AB_LICENSE             707
 
 // Auth gate (activation code)
-#define IDD_AUTH                   800
-#define IDC_AUTH_TITLE             801
-#define IDC_AUTH_PROMPT            802
-#define IDC_AUTH_CODE_LABEL        803
-#define IDC_AUTH_CODE              804
+#define IDD_AUTH                   900
+#define IDC_AUTH_TITLE             901
+#define IDC_AUTH_PROMPT            902
+#define IDC_AUTH_CODE_LABEL        903
+#define IDC_AUTH_CODE              904
 
 #endif // RESOURCE_H
 
-#define IDC_AUTH_HEADING 4206
-#define IDC_AUTH_CONFIRM_LABEL 4207
-#define IDC_AUTH_CONFIRM 4208
-#define IDC_AUTH_ERROR 4209
-#define IDC_AUTH_FOOTER 4210
+#define IDC_AUTH_HEADING 905
+#define IDC_AUTH_CONFIRM_LABEL 906
+#define IDC_AUTH_CONFIRM 907
+#define IDC_AUTH_ERROR 908
+#define IDC_AUTH_FOOTER 909

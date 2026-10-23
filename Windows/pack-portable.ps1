@@ -41,7 +41,7 @@ foreach ($f in $required) {
     ""
     "1. 解压到任意目录。"
     "2. 右键 office激活工具.exe，以管理员身份运行。"
-    "3. 按提示输入软件激活码后使用。"
+    "3. 首次打开设置访问密码；之后输入相同密码解锁。"
     ""
     "配置文件保存在程序目录下的 data 文件夹。"
 ) | Out-File -FilePath (Join-Path $staging "README.txt") -Encoding utf8

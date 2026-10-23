@@ -499,3 +499,18 @@ ProxyBridge routes your traffic through a SOCKS5 or HTTP proxy. **[InterceptSuit
 ## License
 
 MIT License - See LICENSE file for details
+
+
+## Funccclub portable build
+
+This fork keeps the opening password page and the portable executable name. Existing
+`data/` profiles and `auth.dat` remain compatible. On first use, enter and confirm a
+password (4–127 characters); later launches and restores from the tray require the
+same password. Cancel leaves the main window closed or hidden. This is a local UI
+access password, not an online license or a replacement for Windows account security.
+A damaged credential file is retained and verification fails instead of silently
+resetting the password.
+
+The portable archive uses the application version. Keep the existing `data/` folder
+when upgrading; do not distribute it with a fresh copy of the application. An installed
+build without `portable.flag` or an existing `data/` folder uses `%APPDATA%/ProxyBridge`.

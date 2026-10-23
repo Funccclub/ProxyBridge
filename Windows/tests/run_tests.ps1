@@ -172,6 +172,9 @@ if ($runStatic) {
     Check ([regex]::Match((Read-Text 'gui\res\app.manifest'), 'assemblyIdentity version="([^"]+)"').Groups[1].Value -eq "$ver.0") "app.manifest version is $ver.0"
     Check ((Read-Text '..\CONTRIBUTING.md').Contains("ProxyBridge-Setup-$ver.exe")) "CONTRIBUTING.md names ProxyBridge-Setup-$ver.exe"
 
+    $dialogIds = [regex]::Matches($resH, '#define\s+(IDD_\w+)\s+(\d+)') | ForEach-Object { $_.Groups[2].Value }
+    Check (@($dialogIds | Group-Object | Where-Object Count -gt 1).Count -eq 0) 'dialog resource ids are unique across upstream and fork dialogs'
+
     # 2. the installer: elevated, locked-down install folder, service ACL, normal-user launch, clean uninstall
     Check ($nsi -match 'RequestExecutionLevel admin') 'installer runs elevated'
     $ic = [regex]::Match($nsi, 'icacls "\$INSTDIR"[^\r\n]*').Value
