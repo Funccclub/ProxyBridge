@@ -3,6 +3,7 @@
 #define PB_AUTH_H
 
 #include <windows.h>
+#define AUTH_PASSWORD_MAX 127
 
 // Initialize auth storage path (call after PB_InitStorage).
 void Auth_Init(void);

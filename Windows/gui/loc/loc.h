@@ -43,6 +43,7 @@ enum {
     S_AUTH_CAP, S_AUTH_PROMPT, S_AUTH_CODE, S_AUTH_BTN,
     S_AUTH_ERR_EMPTY, S_AUTH_ERR_SHORT, S_AUTH_ERR_SAVE, S_AUTH_ERR_BAD,
     S_M_ZOOM_IN, S_M_ZOOM_OUT, S_M_ZOOM_RESET,
+    S_AUTH_HEADING, S_AUTH_SETUP_HEADING, S_AUTH_SETUP_PROMPT, S_AUTH_CONFIRM, S_AUTH_SETUP_BTN, S_AUTH_MISMATCH, S_AUTH_FOOTER,
     S_COUNT
 };
 
@@ -225,17 +226,24 @@ static const wchar_t* const g_strings[S_COUNT][2] = {
     /* S_L_NAME             */ { L"Name:", L"名称:" },
     /* S_COL_NAME           */ { L"Name", L"名称" },
     /* S_CHK_SENDDOMAIN     */ { L"Let proxy resolve DNS (send hostname)", L"由代理解析 DNS (发送主机名)" },
-    /* S_AUTH_CAP           */ { L"Activation", L"激活" },
-    /* S_AUTH_PROMPT        */ { L"请输入软件激活码后使用", L"请输入软件激活码后使用" },
-    /* S_AUTH_CODE          */ { L"Code:", L"激活码:" },
-    /* S_AUTH_BTN           */ { L"Activate", L"激活" },
-    /* S_AUTH_ERR_EMPTY     */ { L"Please enter the activation code.", L"请输入激活码。" },
-    /* S_AUTH_ERR_SHORT     */ { L"Activation code must be at least 4 characters.", L"激活码至少需要 4 个字符。" },
-    /* S_AUTH_ERR_SAVE      */ { L"Could not save the activation code.", L"无法保存激活码。" },
-    /* S_AUTH_ERR_BAD       */ { L"Invalid activation code. Please try again.", L"激活码无效，请重试。" },
+    /* S_AUTH_CAP            */ { L"Access verification", L"访问验证" },
+    /* S_AUTH_PROMPT         */ { L"Enter your password to continue.", L"输入访问密码，继续使用。" },
+    /* S_AUTH_CODE           */ { L"Password", L"访问密码" },
+    /* S_AUTH_BTN            */ { L"Unlock", L"解锁并进入" },
+    /* S_AUTH_ERR_EMPTY      */ { L"Please enter your password.", L"请输入访问密码。" },
+    /* S_AUTH_ERR_SHORT      */ { L"Use at least 4 characters.", L"密码至少需要 4 个字符。" },
+    /* S_AUTH_ERR_SAVE       */ { L"Could not save your password. Check folder permissions.", L"无法保存密码，请检查文件夹权限。" },
+    /* S_AUTH_ERR_BAD        */ { L"Incorrect password or unreadable password file.", L"密码错误或密码文件无法读取，请重试。" },
     /* S_M_ZOOM_IN         */ { L"Increase Text Size	Ctrl++", L"放大文字	Ctrl++" },
     /* S_M_ZOOM_OUT        */ { L"Decrease Text Size	Ctrl+-", L"缩小文字	Ctrl+-" },
     /* S_M_ZOOM_RESET      */ { L"Reset Text Size	Ctrl+0", L"重置文字大小	Ctrl+0" },
+    /* S_AUTH_HEADING        */ { L"Welcome back", L"欢迎回来" },
+    /* S_AUTH_SETUP_HEADING  */ { L"Set your password", L"设置访问密码" },
+    /* S_AUTH_SETUP_PROMPT   */ { L"Create a password to protect access to this window.", L"首次使用，请设置密码以保护此窗口的访问。" },
+    /* S_AUTH_CONFIRM        */ { L"Confirm password", L"确认密码" },
+    /* S_AUTH_SETUP_BTN      */ { L"Set password and continue", L"设置密码并继续" },
+    /* S_AUTH_MISMATCH       */ { L"The passwords do not match.", L"两次输入的密码不一致。" },
+    /* S_AUTH_FOOTER         */ { L"Password required again after minimizing to the tray.", L"最小化到托盘后，再次打开需要输入密码。" },
 };
 
 static const wchar_t* T(int id) { return g_strings[id][g_lang ? 1 : 0]; }

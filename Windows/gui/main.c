@@ -42,17 +42,17 @@
 #pragma comment(lib, "uxtheme.lib")
 
 // dark theme
-#define C_BG      RGB(0x1E, 0x1E, 0x1E)   // window / edit background
-#define C_PANEL   RGB(0x25, 0x25, 0x26)   // strip background
-#define C_TEXT    RGB(0xD4, 0xD4, 0xD4)
-#define C_DIM     RGB(0x8A, 0x8A, 0x8A)
-#define C_TAB     RGB(0x2D, 0x2D, 0x30)   // inactive tab
-#define C_TABSEL  RGB(0x1E, 0x1E, 0x1E)   // active tab (matches content)
-#define C_TABHOT  RGB(0x3E, 0x3E, 0x42)   // hovered tab
-#define C_ACCENT  RGB(0x00, 0x7A, 0xCC)   // active-tab top strip
-#define C_MENU    RGB(0x2D, 0x2D, 0x30)
-#define C_MENUHOT RGB(0x3E, 0x3E, 0x46)
-#define C_LINE    RGB(0x3F, 0x3F, 0x46)
+#define C_BG      RGB(0x10, 0x18, 0x27)   // window / edit background
+#define C_PANEL   RGB(0x17, 0x21, 0x34)   // strip background
+#define C_TEXT    RGB(0xE9, 0xEE, 0xF7)
+#define C_DIM     RGB(0x8E, 0x9F, 0xB7)
+#define C_TAB     RGB(0x1B, 0x29, 0x40)   // inactive tab
+#define C_TABSEL  RGB(0x10, 0x18, 0x27)   // active tab (matches content)
+#define C_TABHOT  RGB(0x25, 0x38, 0x54)   // hovered tab
+#define C_ACCENT  RGB(0x60, 0xA5, 0xFA)   // active-tab top strip
+#define C_MENU    RGB(0x1B, 0x29, 0x40)
+#define C_MENUHOT RGB(0x25, 0x38, 0x54)
+#define C_LINE    RGB(0x32, 0x46, 0x63)
 #define C_WARN    RGB(0xD7, 0xA5, 0x22)   // amber hint for the UDP note
 
 static HBRUSH g_brBg, g_brPanel, g_brTab, g_brTabSel, g_brTabHot, g_brAccent, g_brMenu, g_brMenuHot;

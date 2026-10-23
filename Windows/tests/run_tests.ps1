@@ -101,6 +101,7 @@ $tests = @(
     @{ n='test_gui_misc';        src=@('tests\test_gui_misc.c', $prof, 'gui\auth\auth.c');                     cl=$clUni;   link=$lnGui;  ui=$false },
     @{ n='test_rules_ui';        src=@('tests\test_rules_ui.c', $prof, 'gui\auth\auth.c', $res);               cl=$clUni;   link=$lnGui;  ui=$true },
     @{ n='test_main_ui';         src=@('tests\test_main_ui.c', $prof, 'gui\auth\auth.c', $res);                cl=$clUni;   link=$lnGui;  ui=$true },
+    @{ n='test_auth_ui';         src=@('tests\test_auth_ui.c', $prof, 'gui\auth\auth.c', $res); cl=$clUni; link=$lnGui; ui=$true },
     @{ n='test_dialogs_ui';      src=@('tests\test_dialogs_ui.c', $prof, 'gui\auth\auth.c', $res);             cl=$clUni;   link=$lnGui;  ui=$true }
 )
 $runStatic = $true

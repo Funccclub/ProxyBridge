@@ -332,7 +332,8 @@ if ($success) {
     if (Test-Path "$OutputDir\office激活工具.exe") {
         $packScript = Join-Path $PSScriptRoot "pack-portable.ps1"
         if (Test-Path $packScript) {
-            & $packScript -OutputDir $OutputDir -Version "1.0.0"
+            $portableVersion = [regex]::Match((Get-Content "gui\res\resource.h" -Raw), 'PB_VER_STR\s+"([^"]+)"').Groups[1].Value
+            & $packScript -OutputDir $OutputDir -Version $portableVersion
             if ($LASTEXITCODE -ne 0) { exit 1 }
         }
     } else {
