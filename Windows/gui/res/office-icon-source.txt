@@ -1,0 +1,4 @@
+Office product icon asset
+Source: https://res.cdn.office.net/files/fabric-cdn-prod_20221201.001/assets/brand-icons/product/svg/office_48x1.svg
+Microsoft Office product mark; upstream ProxyBridge artwork replaced in this fork at the user's request.
+logo.ico is packaged from this SVG at 16, 20, 24, 32, 40, 48, 64, 96, 128 and 256 pixels.

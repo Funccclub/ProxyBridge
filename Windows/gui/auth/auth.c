@@ -62,23 +62,29 @@ static int b64_val(char c)
     return -1;
 }
 
-static BOOL b64_decode(const char* in, BYTE* out, DWORD* outLen)
+// Reject invalid padding and check capacity before every decoded write.
+static BOOL b64_decode(const char* in, BYTE* out, DWORD capacity, DWORD* outLen)
 {
-    DWORD len = (DWORD)strlen(in), o = 0;
-    DWORD i = 0;
-    while (i < len)
-    {
-        int a = b64_val(in[i++]); if (a < 0) break;
-        int b = (i < len) ? b64_val(in[i++]) : -1;
-        int c = (i < len) ? b64_val(in[i++]) : -1;
-        int d = (i < len) ? b64_val(in[i++]) : -1;
-        if (b < 0) break;
+    size_t len = strlen(in);
+    DWORD o = 0;
+    *outLen = 0;
+    if (!len || len % 4) return FALSE;
+    for (size_t i = 0; i < len; i += 4) {
+        int a = b64_val(in[i]), b = b64_val(in[i+1]);
+        int c = in[i+2] == '=' ? 0 : b64_val(in[i+2]);
+        int d = in[i+3] == '=' ? 0 : b64_val(in[i+3]);
+        BOOL pad2 = in[i+2] == '=', pad1 = in[i+3] == '=';
+        if (a < 0 || b < 0 || c < 0 || d < 0 || (pad2 && !pad1)) return FALSE;
+        if ((pad1 || pad2) && i + 4 != len) return FALSE;
+        if ((pad2 && (b & 15)) || (pad1 && !pad2 && (c & 3))) return FALSE;
+        DWORD n = pad2 ? 1 : pad1 ? 2 : 3;
+        if (n > capacity - o) return FALSE;
         out[o++] = (BYTE)((a << 2) | (b >> 4));
-        if (c >= 0) out[o++] = (BYTE)(((b & 0xF) << 4) | (c >> 2));
-        if (d >= 0) out[o++] = (BYTE)(((c & 0x3) << 6) | d);
+        if (n > 1) out[o++] = (BYTE)((b << 4) | (c >> 2));
+        if (n > 2) out[o++] = (BYTE)((c << 6) | d);
     }
     *outLen = o;
-    return o > 0;
+    return TRUE;
 }
 
 static BOOL derive_hash(const wchar_t* password, const BYTE* salt, DWORD saltLen,
@@ -119,33 +125,16 @@ static const char* json_str(const char* json, const char* key, char* out, int ou
     const char* e = strchr(p, '"');
     if (!e) { if (outCch) out[0] = 0; return NULL; }
     int n = (int)(e - p);
-    if (n >= outCch) n = outCch - 1;
+    if (n >= outCch) { if (outCch) out[0] = 0; return NULL; }
     memcpy(out, p, (size_t)n);
     out[n] = 0;
     return out;
 }
 
-static BOOL auth_file_readable(void)
-{
-    char json[512];
-    char saltB64[64], hashB64[64];
-    BYTE salt[AUTH_SALT_BYTES], hash[AUTH_HASH_BYTES];
-    DWORD saltLen = 0, hashLen = 0;
-    if (!read_auth_file(json, sizeof(json))) return FALSE;
-    if (!json_str(json, "salt", saltB64, sizeof(saltB64))) return FALSE;
-    if (!json_str(json, "hash", hashB64, sizeof(hashB64))) return FALSE;
-    if (!b64_decode(saltB64, salt, &saltLen) || saltLen != AUTH_SALT_BYTES) return FALSE;
-    if (!b64_decode(hashB64, hash, &hashLen) || hashLen != AUTH_HASH_BYTES) return FALSE;
-    return TRUE;
-}
-
 void Auth_Init(void)
 {
     auth_path(g_authPath, MAX_PATH);
-    // Old builds wrote unpadded base64, so later unlocks always failed. Drop the bad file
-    // so the next successful unlock can store a correct hash.
-    if (Auth_HasPassword() && !auth_file_readable())
-        DeleteFileW(g_authPath);
+    // Never delete a damaged credential file: that would silently reset the password.
 }
 
 BOOL Auth_HasPassword(void)
@@ -156,7 +145,7 @@ BOOL Auth_HasPassword(void)
 
 BOOL Auth_SetPassword(const wchar_t* password)
 {
-    if (!password || !password[0] || lstrlenW(password) < 4) return FALSE;
+    if (!password || !password[0] || lstrlenW(password) < 4 || lstrlenW(password) > AUTH_PASSWORD_MAX) return FALSE;
     if (!ensure_data_dir()) return FALSE;
 
     BYTE salt[AUTH_SALT_BYTES], hash[AUTH_HASH_BYTES];
@@ -191,7 +180,7 @@ BOOL Auth_SetPassword(const wchar_t* password)
 
 BOOL Auth_Verify(const wchar_t* password)
 {
-    if (!password || !password[0]) return FALSE;
+    if (!password || !password[0] || lstrlenW(password) > AUTH_PASSWORD_MAX) return FALSE;
 
     char json[512];
     if (!read_auth_file(json, sizeof(json))) return FALSE;
@@ -202,11 +191,13 @@ BOOL Auth_Verify(const wchar_t* password)
 
     BYTE salt[AUTH_SALT_BYTES], expect[AUTH_HASH_BYTES], got[AUTH_HASH_BYTES];
     DWORD saltLen = 0, hashLen = 0;
-    if (!b64_decode(saltB64, salt, &saltLen) || saltLen != AUTH_SALT_BYTES) return FALSE;
-    if (!b64_decode(hashB64, expect, &hashLen) || hashLen != AUTH_HASH_BYTES) return FALSE;
+    if (!b64_decode(saltB64, salt, sizeof(salt), &saltLen) || saltLen != AUTH_SALT_BYTES) return FALSE;
+    if (!b64_decode(hashB64, expect, sizeof(expect), &hashLen) || hashLen != AUTH_HASH_BYTES) return FALSE;
     if (!derive_hash(password, salt, saltLen, got, AUTH_HASH_BYTES)) return FALSE;
 
     volatile BYTE diff = 0;
     for (DWORD i = 0; i < AUTH_HASH_BYTES; i++) diff |= (got[i] ^ expect[i]);
+    SecureZeroMemory(got, sizeof(got));
+    SecureZeroMemory(expect, sizeof(expect));
     return diff == 0;
 }
