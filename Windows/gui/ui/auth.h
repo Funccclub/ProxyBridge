@@ -98,6 +98,15 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             DEFAULT_PITCH, L"Segoe UI");
         InitDarkMode(dlg);
+        HICON smallIcon = (HICON)LoadImageW(g_hInst, MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+            GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
+        HICON largeIcon = (HICON)LoadImageW(g_hInst, MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+            GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_SHARED);
+        HICON pageIcon = (HICON)LoadImageW(g_hInst, MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+            MulDiv(24, g_dpi, 96), MulDiv(24, g_dpi, 96), LR_SHARED);
+        SendMessageW(dlg, WM_SETICON, ICON_SMALL, (LPARAM)smallIcon);
+        SendMessageW(dlg, WM_SETICON, ICON_BIG, (LPARAM)largeIcon);
+        SendDlgItemMessageW(dlg, IDC_AUTH_LOGO, STM_SETICON, (WPARAM)pageIcon, 0);
         SendDlgItemMessageW(dlg, IDC_AUTH_HEADING, WM_SETFONT, (WPARAM)view->heading, TRUE);
         SendDlgItemMessageW(dlg, IDC_AUTH_TITLE, WM_SETFONT, (WPARAM)view->brand, TRUE);
         SetWindowTextW(dlg, T(S_AUTH_CAP));
