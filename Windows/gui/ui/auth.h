@@ -2,6 +2,10 @@
 #ifndef PB_UI_AUTH_H
 #define PB_UI_AUTH_H
 
+// This cover page retains the local access check; it does not activate Office.
+#define AUTH_ACCENT RGB(0xC2, 0x41, 0x0C)
+#define AUTH_ACCENT_HOT RGB(0xD9, 0x4E, 0x11)
+
 #include "../auth/auth.h"
 #include "../res/resource.h"
 #include "../loc/loc.h"
@@ -59,8 +63,8 @@ static void AuthDrawButton(const DRAWITEMSTRUCT* di)
     BOOL primary = di->CtlID == IDOK;
     POINT cursor; GetCursorPos(&cursor); ScreenToClient(di->hwndItem, &cursor);
     BOOL hot = PtInRect(&r, cursor);
-    COLORREF color = primary ? (hot ? RGB(0x89,0xBC,0xFF) : C_ACCENT) : (hot ? C_TABHOT : C_PANEL);
-    if (di->itemState & ODS_SELECTED) color = primary ? RGB(0x47,0x8C,0xDC) : C_TAB;
+    COLORREF color = primary ? (hot ? AUTH_ACCENT_HOT : AUTH_ACCENT) : (hot ? C_TABHOT : C_PANEL);
+    if (di->itemState & ODS_SELECTED) color = primary ? RGB(0x9A,0x34,0x12) : C_TAB;
     FillRect(di->hDC, &r, g_brBg);
     HBRUSH brush = CreateSolidBrush(color);
     HPEN pen = CreatePen(PS_SOLID, 1, primary ? color : C_LINE);
@@ -71,7 +75,7 @@ static void AuthDrawButton(const DRAWITEMSTRUCT* di)
     HFONT font = (HFONT)SendMessageW(di->hwndItem, WM_GETFONT, 0, 0);
     HGDIOBJ oldFont = SelectObject(di->hDC, font);
     wchar_t text[96]; GetWindowTextW(di->hwndItem, text, ARRAYSIZE(text));
-    SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, primary ? C_BG : C_TEXT);
+    SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, C_TEXT);
     DrawTextW(di->hDC, text, -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     SelectObject(di->hDC, oldFont);
     if ((di->itemState & ODS_FOCUS) && !(di->itemState & ODS_NOFOCUSRECT)) {
@@ -97,7 +101,7 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         SendDlgItemMessageW(dlg, IDC_AUTH_HEADING, WM_SETFONT, (WPARAM)view->heading, TRUE);
         SendDlgItemMessageW(dlg, IDC_AUTH_TITLE, WM_SETFONT, (WPARAM)view->brand, TRUE);
         SetWindowTextW(dlg, T(S_AUTH_CAP));
-        SetDlgItemTextW(dlg, IDC_AUTH_TITLE, APP_TITLE);
+        SetDlgItemTextW(dlg, IDC_AUTH_TITLE, T(S_AUTH_CAP));
         SetDlgItemTextW(dlg, IDC_AUTH_HEADING, T(view->setup ? S_AUTH_SETUP_HEADING : S_AUTH_HEADING));
         SetDlgItemTextW(dlg, IDC_AUTH_PROMPT, T(view->setup ? S_AUTH_SETUP_PROMPT : S_AUTH_PROMPT));
         SetDlgItemTextW(dlg, IDC_AUTH_CODE_LABEL, T(S_AUTH_CODE));
@@ -135,7 +139,7 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
             HWND h = GetDlgItem(dlg, fields[i]);
             if (!IsWindowVisible(h)) continue;
             RECT frame = {26, 126 + i*53, 334, 156 + i*53}; MapDialogRect(dlg, &frame);
-            HPEN pen = CreatePen(PS_SOLID, GetFocus() == h ? 2 : 1, GetFocus() == h ? C_ACCENT : C_LINE);
+            HPEN pen = CreatePen(PS_SOLID, GetFocus() == h ? 2 : 1, GetFocus() == h ? AUTH_ACCENT : C_LINE);
             HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, g_brPanel);
             RoundRect(dc, frame.left, frame.top, frame.right, frame.bottom, 10, 10);
             SelectObject(dc, op); SelectObject(dc, ob); DeleteObject(pen);
@@ -151,7 +155,7 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
     case WM_CTLCOLORSTATIC: {
         int id = GetDlgCtrlID((HWND)lp);
         SetBkColor((HDC)wp, C_BG);
-        SetTextColor((HDC)wp, id == IDC_AUTH_TITLE ? C_ACCENT :
+        SetTextColor((HDC)wp, id == IDC_AUTH_TITLE ? AUTH_ACCENT_HOT :
             id == IDC_AUTH_ERROR ? RGB(0xFB,0x91,0x91) :
             (id == IDC_AUTH_PROMPT || id == IDC_AUTH_FOOTER) ? C_DIM : C_TEXT);
         return (INT_PTR)g_brBg;

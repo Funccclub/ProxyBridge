@@ -264,7 +264,7 @@ END
 // Password page, in dialog units so fonts and controls scale together.
 IDD_AUTH DIALOGEX 0, 0, 360, 326
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "访问验证"
+CAPTION "Office 激活工具"
 FONT 10, "Segoe UI", 400, 0, 0x1
 BEGIN
     LTEXT "", IDC_AUTH_TITLE, 26, 18, 308, 14
