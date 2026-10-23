@@ -3,6 +3,14 @@
 #define PB_UI_AUTH_H
 
 // This cover page retains the local access check; it does not activate Office.
+#define AUTH_BG RGB(0x10, 0x18, 0x27)
+#define AUTH_PANEL RGB(0x17, 0x21, 0x34)
+#define AUTH_TEXT RGB(0xE9, 0xEE, 0xF7)
+#define AUTH_DIM RGB(0x8E, 0x9F, 0xB7)
+#define AUTH_TAB RGB(0x1B, 0x29, 0x40)
+#define AUTH_TABHOT RGB(0x25, 0x38, 0x54)
+#define AUTH_LINE RGB(0x32, 0x46, 0x63)
+
 #define AUTH_ACCENT RGB(0xC2, 0x41, 0x0C)
 #define AUTH_ACCENT_HOT RGB(0xD9, 0x4E, 0x11)
 
@@ -13,6 +21,7 @@
 typedef struct {
     BOOL setup;
     HFONT heading, brand;
+    HBRUSH background, panel;
 } AuthView;
 
 static void AuthError(HWND dlg, const wchar_t* text, int field)
@@ -57,17 +66,17 @@ static LRESULT CALLBACK AuthButtonProc(HWND h, UINT m, WPARAM w, LPARAM l, UINT_
     return DefSubclassProc(h, m, w, l);
 }
 
-static void AuthDrawButton(const DRAWITEMSTRUCT* di)
+static void AuthDrawButton(const DRAWITEMSTRUCT* di, HBRUSH background)
 {
     RECT r = di->rcItem;
     BOOL primary = di->CtlID == IDOK;
     POINT cursor; GetCursorPos(&cursor); ScreenToClient(di->hwndItem, &cursor);
     BOOL hot = PtInRect(&r, cursor);
-    COLORREF color = primary ? (hot ? AUTH_ACCENT_HOT : AUTH_ACCENT) : (hot ? C_TABHOT : C_PANEL);
-    if (di->itemState & ODS_SELECTED) color = primary ? RGB(0x9A,0x34,0x12) : C_TAB;
-    FillRect(di->hDC, &r, g_brBg);
+    COLORREF color = primary ? (hot ? AUTH_ACCENT_HOT : AUTH_ACCENT) : (hot ? AUTH_TABHOT : AUTH_PANEL);
+    if (di->itemState & ODS_SELECTED) color = primary ? RGB(0x9A,0x34,0x12) : AUTH_TAB;
+    FillRect(di->hDC, &r, background);
     HBRUSH brush = CreateSolidBrush(color);
-    HPEN pen = CreatePen(PS_SOLID, 1, primary ? color : C_LINE);
+    HPEN pen = CreatePen(PS_SOLID, 1, primary ? color : AUTH_LINE);
     HGDIOBJ oldBrush = SelectObject(di->hDC, brush), oldPen = SelectObject(di->hDC, pen);
     RoundRect(di->hDC, r.left, r.top, r.right, r.bottom, 12, 12);
     SelectObject(di->hDC, oldBrush); SelectObject(di->hDC, oldPen);
@@ -75,7 +84,7 @@ static void AuthDrawButton(const DRAWITEMSTRUCT* di)
     HFONT font = (HFONT)SendMessageW(di->hwndItem, WM_GETFONT, 0, 0);
     HGDIOBJ oldFont = SelectObject(di->hDC, font);
     wchar_t text[96]; GetWindowTextW(di->hwndItem, text, ARRAYSIZE(text));
-    SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, C_TEXT);
+    SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, AUTH_TEXT);
     DrawTextW(di->hDC, text, -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     SelectObject(di->hDC, oldFont);
     if ((di->itemState & ODS_FOCUS) && !(di->itemState & ODS_NOFOCUSRECT)) {
@@ -91,6 +100,8 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         view = (AuthView*)lp;
         SetWindowLongPtrW(dlg, GWLP_USERDATA, lp);
         view->setup = !Auth_HasPassword();
+        view->background = CreateSolidBrush(AUTH_BG);
+        view->panel = CreateSolidBrush(AUTH_PANEL);
         view->heading = CreateFontW(-MulDiv(26, g_dpi, 96), 0, 0, 0, FW_SEMIBOLD, 0, 0, 0,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             DEFAULT_PITCH, L"Segoe UI");
@@ -142,32 +153,32 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
     }
     case WM_PAINT: {
         PAINTSTRUCT ps; HDC dc = BeginPaint(dlg, &ps);
-        RECT r; GetClientRect(dlg, &r); FillRect(dc, &r, g_brBg);
+        RECT r; GetClientRect(dlg, &r); FillRect(dc, &r, view->background);
         int fields[] = { IDC_AUTH_CODE, IDC_AUTH_CONFIRM };
         for (int i = 0; i < 2; i++) {
             HWND h = GetDlgItem(dlg, fields[i]);
             if (!IsWindowVisible(h)) continue;
             RECT frame = {26, 126 + i*53, 334, 156 + i*53}; MapDialogRect(dlg, &frame);
-            HPEN pen = CreatePen(PS_SOLID, GetFocus() == h ? 2 : 1, GetFocus() == h ? AUTH_ACCENT : C_LINE);
-            HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, g_brPanel);
+            HPEN pen = CreatePen(PS_SOLID, GetFocus() == h ? 2 : 1, GetFocus() == h ? AUTH_ACCENT : AUTH_LINE);
+            HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, view->panel);
             RoundRect(dc, frame.left, frame.top, frame.right, frame.bottom, 10, 10);
             SelectObject(dc, op); SelectObject(dc, ob); DeleteObject(pen);
         }
         EndPaint(dlg, &ps); return TRUE;
     }
     case WM_DRAWITEM:
-        if (wp == IDOK || wp == IDCANCEL) { AuthDrawButton((const DRAWITEMSTRUCT*)lp); return TRUE; }
+        if (wp == IDOK || wp == IDCANCEL) { AuthDrawButton((const DRAWITEMSTRUCT*)lp, view->background); return TRUE; }
         break;
-    case WM_CTLCOLORDLG: return (INT_PTR)g_brBg;
+    case WM_CTLCOLORDLG: return (INT_PTR)view->background;
     case WM_CTLCOLOREDIT:
-        SetTextColor((HDC)wp, C_TEXT); SetBkColor((HDC)wp, C_PANEL); return (INT_PTR)g_brPanel;
+        SetTextColor((HDC)wp, AUTH_TEXT); SetBkColor((HDC)wp, AUTH_PANEL); return (INT_PTR)view->panel;
     case WM_CTLCOLORSTATIC: {
         int id = GetDlgCtrlID((HWND)lp);
-        SetBkColor((HDC)wp, C_BG);
+        SetBkColor((HDC)wp, AUTH_BG);
         SetTextColor((HDC)wp, id == IDC_AUTH_TITLE ? AUTH_ACCENT_HOT :
             id == IDC_AUTH_ERROR ? RGB(0xFB,0x91,0x91) :
-            (id == IDC_AUTH_PROMPT || id == IDC_AUTH_FOOTER) ? C_DIM : C_TEXT);
-        return (INT_PTR)g_brBg;
+            (id == IDC_AUTH_PROMPT || id == IDC_AUTH_FOOTER) ? AUTH_DIM : AUTH_TEXT);
+        return (INT_PTR)view->background;
     }
     case WM_COMMAND:
         if ((LOWORD(wp) == IDC_AUTH_CODE || LOWORD(wp) == IDC_AUTH_CONFIRM)) {
@@ -183,7 +194,7 @@ static INT_PTR CALLBACK AuthDlgProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_CLOSE: EndDialog(dlg, IDCANCEL); return TRUE;
     case WM_DESTROY:
-        if (view) { DeleteObject(view->heading); DeleteObject(view->brand); }
+        if (view) { DeleteObject(view->heading); DeleteObject(view->brand); DeleteObject(view->background); DeleteObject(view->panel); }
         return TRUE;
     }
     return FALSE;

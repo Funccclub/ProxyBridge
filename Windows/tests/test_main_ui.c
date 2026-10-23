@@ -56,6 +56,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmd, int show)
     g_api.SetEnabled = StubSetEnabled; g_api.SetTrafficLoggingEnabled = StubSetTraffic; g_api.SetLogEveryConnection = StubSetLogAll;
     g_api.SetLogCallback = StubSetLog; g_api.SetConnectionCallback = StubSetConn;
 
+    if (cmd && wcsstr(cmd, L"--preview")) g_lang = 1;
+
     CreateDarkBrushes();
     WNDCLASSEXW wc; ZeroMemory(&wc, sizeof(wc));
     wc.cbSize = sizeof(wc); wc.lpfnWndProc = WndProc; wc.hInstance = hInst;
@@ -66,6 +68,14 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmd, int show)
     CHECK(g_hMain != NULL);
     BuildMainMenu(g_hMain); DrawMenuBar(g_hMain); TrayAdd(g_hMain); SyncMenuChecks(g_hMain); RebuildProfileMenu(g_hMain); UpdateTitle();
     g_api.SetEnabled(g_proxyEnabled);                       /* what startup does */
+
+    if (cmd && wcsstr(cmd, L"--preview-servers")) {
+        g_api.GetFlows = StubGetFlows;
+        ShowWindow(g_hMain, SW_SHOWNORMAL); UpdateWindow(g_hMain);
+        DialogBoxW(g_hInst, MAKEINTRESOURCEW(IDD_SERVERS), g_hMain, ServersDlgProc);
+        g_reallyExit = TRUE; DestroyWindow(g_hMain);
+        return 0;
+    }
 
     /* 1. on by default: the item exists, is checked, and nothing says "paused" */
     wchar_t title[256]; GetWindowTextW(g_hMain, title, 256);

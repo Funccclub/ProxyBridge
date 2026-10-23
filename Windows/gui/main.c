@@ -42,17 +42,17 @@
 #pragma comment(lib, "uxtheme.lib")
 
 // dark theme
-#define C_BG      RGB(0x10, 0x18, 0x27)   // window / edit background
-#define C_PANEL   RGB(0x17, 0x21, 0x34)   // strip background
-#define C_TEXT    RGB(0xE9, 0xEE, 0xF7)
-#define C_DIM     RGB(0x8E, 0x9F, 0xB7)
-#define C_TAB     RGB(0x1B, 0x29, 0x40)   // inactive tab
-#define C_TABSEL  RGB(0x10, 0x18, 0x27)   // active tab (matches content)
-#define C_TABHOT  RGB(0x25, 0x38, 0x54)   // hovered tab
-#define C_ACCENT  RGB(0x60, 0xA5, 0xFA)   // active-tab top strip
-#define C_MENU    RGB(0x1B, 0x29, 0x40)
-#define C_MENUHOT RGB(0x25, 0x38, 0x54)
-#define C_LINE    RGB(0x32, 0x46, 0x63)
+#define C_BG      RGB(0x1E, 0x1E, 0x1E)   // window / edit background
+#define C_PANEL   RGB(0x25, 0x25, 0x26)   // strip background
+#define C_TEXT    RGB(0xD4, 0xD4, 0xD4)
+#define C_DIM     RGB(0x8A, 0x8A, 0x8A)
+#define C_TAB     RGB(0x2D, 0x2D, 0x30)   // inactive tab
+#define C_TABSEL  RGB(0x1E, 0x1E, 0x1E)   // active tab (matches content)
+#define C_TABHOT  RGB(0x3E, 0x3E, 0x42)   // hovered tab
+#define C_ACCENT  RGB(0x00, 0x7A, 0xCC)   // active-tab top strip
+#define C_MENU    RGB(0x2D, 0x2D, 0x30)
+#define C_MENUHOT RGB(0x3E, 0x3E, 0x46)
+#define C_LINE    RGB(0x3F, 0x3F, 0x46)
 #define C_WARN    RGB(0xD7, 0xA5, 0x22)   // amber hint for the UDP note
 
 static HBRUSH g_brBg, g_brPanel, g_brTab, g_brTabSel, g_brTabHot, g_brAccent, g_brMenu, g_brMenuHot;
@@ -559,24 +559,23 @@ static LRESULT CALLBACK ZoomSubclass(HWND h, UINT m, WPARAM w, LPARAM l, UINT_PT
 static void LayoutMain(HWND hwnd)
 {
     RECT rc; GetClientRect(hwnd, &rc);
-    int margin = Sc(16), gap = Sc(10), tabTop = Sc(10), tabH = Sc(34);
-    int width = rc.right - margin * 2; if (width < 0) width = 0;
-    MoveWindow(g_hTab, margin, tabTop, width, tabH, TRUE);
-    int top = tabTop + tabH + gap;
-    int barH = Sc(32), clearW = Sc(130);
-    int searchW = width - clearW - gap; if (searchW < 0) searchW = 0;
-    int logTop = top + barH + gap;
-    int logH = rc.bottom - logTop - margin; if (logH < 0) logH = 0;
-    MoveWindow(g_hConnSearch, margin, top, searchW, barH, TRUE);
-    MoveWindow(g_hActSearch, margin, top, searchW, barH, TRUE);
-    MoveWindow(g_hConnClear, margin + searchW + gap, top, clearW, barH, TRUE);
-    MoveWindow(g_hActClear, margin + searchW + gap, top, clearW, barH, TRUE);
-    MoveWindow(g_hConnLog, margin, logTop, width, logH, TRUE);
-    MoveWindow(g_hActLog, margin, logTop, width, logH, TRUE);
-    MoveWindow(g_hFlowsClear, margin, top, clearW, barH, TRUE);
-    MoveWindow(g_hFlows, margin, logTop, width, logH, TRUE);
+    int tabTop = Sc(6), tabH = Sc(32);       // small gap below the menu bar
+    MoveWindow(g_hTab, 0, tabTop, rc.right, tabH, TRUE);
+    int top = tabTop + tabH + Sc(6);
+    int barH = Sc(30), clearW = Sc(130), gap = Sc(6);
+    int searchW = rc.right - 4 - clearW - gap - 4;
+    int logTop = top + barH + 4;
+    int logH = rc.bottom - logTop - 4; if (logH < 0) logH = 0;
+    // search box + Clear button row, then the log below (both tabs share the same rect)
+    MoveWindow(g_hConnSearch, 4, top, searchW, barH - 6, TRUE);
+    MoveWindow(g_hActSearch,  4, top, searchW, barH - 6, TRUE);
+    MoveWindow(g_hConnClear,  4 + searchW + gap, top - 1, clearW, barH - 2, TRUE);
+    MoveWindow(g_hActClear,   4 + searchW + gap, top - 1, clearW, barH - 2, TRUE);
+    MoveWindow(g_hConnLog, 2, logTop, rc.right - 4, logH, TRUE);
+    MoveWindow(g_hActLog,  2, logTop, rc.right - 4, logH, TRUE);
+    MoveWindow(g_hFlowsClear, 4, top - 1, clearW, barH - 2, TRUE);
+    MoveWindow(g_hFlows, 2, logTop, rc.right - 4, logH, TRUE);
 }
-
 static void SelectTab(int idx)
 {
     int c = (idx == 0) ? SW_SHOW : SW_HIDE;
