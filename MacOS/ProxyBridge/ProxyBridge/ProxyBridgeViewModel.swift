@@ -9,6 +9,19 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
     @Published var activityLogs: [ActivityLog] = []
     @Published var isProxyActive = false
     @Published var isTrafficLoggingEnabled = true
+    // the system DNS proxy lets the extension learn which names belong to which addresses, which
+    // host name rules and "send hostname" need. per profile, on by default
+    @Published var isDNSEnabled = true
+    // the proxy rules set to "Default" use (issue #274). per profile. nil, or an id that no longer exists,
+    // means the first proxy. see DefaultProxy
+    @Published private(set) var defaultProxyId: String?
+    // set once the extension is installed, the DNS entry is only touched after that
+    private var extensionReady = false
+    // the tunnel start is watched: macOS can stop it again at once without saying why (#282)
+    private var tunnelStartPending = false
+    private var tunnelWatchdog: DispatchWorkItem?
+    private var tunnelFailureObserver: NSObjectProtocol?
+    private var tunnelRepairTried = false
     
     var tunnelSession: NETunnelProviderSession?
     private var logTimer: Timer?
@@ -99,6 +112,8 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         connections.reserveCapacity(maxLogEntries)
         activityLogs.reserveCapacity(maxLogEntries)
         loadTrafficLoggingSetting()
+        loadDNSSetting()
+        loadDefaultProxySetting()
         loadProfiles()
         loadProxyConfig()
         NotificationCenter.default.addObserver(
@@ -142,6 +157,16 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         updatePollingState()
     }
     
+    private func loadDNSSetting() {
+        isDNSEnabled = UserDefaults.standard.object(forKey: "dnsEnabled") as? Bool ?? true
+    }
+
+    func toggleDNS() {
+        isDNSEnabled.toggle()
+        UserDefaults.standard.set(isDNSEnabled, forKey: "dnsEnabled")
+        applyDNSProxy()
+    }
+
     private func sendTrafficLoggingToExtension(_ enabled: Bool) {
         guard let session = tunnelSession else { return }
         
@@ -176,6 +201,8 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
     private func profileLoggingKey(_ name: String) -> String { "profile.\(name).trafficLoggingEnabled" }
     private func profileCloseKey(_ name: String) -> String { "profile.\(name).closeToMenuBar" }
     private func profileStartupKey(_ name: String) -> String { "profile.\(name).runAtStartup" }
+    private func profileDNSKey(_ name: String) -> String { "profile.\(name).dnsEnabled" }
+    private func profileDefaultProxyKey(_ name: String) -> String { "profile.\(name).defaultProxyId" }
 
     private func loadProfiles() {
         let d = UserDefaults.standard
@@ -199,6 +226,8 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         d.set(isTrafficLoggingEnabled, forKey: profileLoggingKey(name))
         d.set(d.bool(forKey: "closeToMenuBar"), forKey: profileCloseKey(name))
         d.set(d.bool(forKey: "runAtStartup"), forKey: profileStartupKey(name))
+        d.set(isDNSEnabled, forKey: profileDNSKey(name))
+        if let id = defaultProxyId { d.set(id, forKey: profileDefaultProxyKey(name)) } else { d.removeObject(forKey: profileDefaultProxyKey(name)) }
     }
 
     // load a profile's snapshot into the live working keys
@@ -215,12 +244,17 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         // window + startup behaviour are per profile too, default off
         d.set(d.object(forKey: profileCloseKey(name)) as? Bool ?? false, forKey: "closeToMenuBar")
         d.set(d.object(forKey: profileStartupKey(name)) as? Bool ?? false, forKey: "runAtStartup")
+        // DNS is on by default, also for profiles saved before the setting existed
+        d.set(d.object(forKey: profileDNSKey(name)) as? Bool ?? true, forKey: "dnsEnabled")
+        if let id = d.string(forKey: profileDefaultProxyKey(name)) { d.set(id, forKey: "defaultProxyId") } else { d.removeObject(forKey: "defaultProxyId") }
     }
 
     // reload in-memory state from the working keys and push it to the extension
     private func applyActiveProfile() {
         loadProxyConfig()
         loadTrafficLoggingSetting()
+        loadDNSSetting()
+        loadDefaultProxySetting()
         // window-close behaviour is read live from the key, only startup needs applying
         LoginItem.applyToSystem(UserDefaults.standard.bool(forKey: "runAtStartup"))
         if let session = tunnelSession {
@@ -228,6 +262,7 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
             RuleManager.resyncRules(session: session) { _, _ in }
             sendTrafficLoggingToExtension(isTrafficLoggingEnabled)
         }
+        applyDNSProxy()
         updatePollingState()
     }
 
@@ -262,11 +297,15 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         d.set(d.object(forKey: profileLoggingKey(old)), forKey: profileLoggingKey(new))
         d.set(d.object(forKey: profileCloseKey(old)), forKey: profileCloseKey(new))
         d.set(d.object(forKey: profileStartupKey(old)), forKey: profileStartupKey(new))
+        d.set(d.object(forKey: profileDNSKey(old)), forKey: profileDNSKey(new))
+        d.set(d.object(forKey: profileDefaultProxyKey(old)), forKey: profileDefaultProxyKey(new))
         d.removeObject(forKey: profileConfigsKey(old))
         d.removeObject(forKey: profileRulesKey(old))
         d.removeObject(forKey: profileLoggingKey(old))
         d.removeObject(forKey: profileCloseKey(old))
         d.removeObject(forKey: profileStartupKey(old))
+        d.removeObject(forKey: profileDNSKey(old))
+        d.removeObject(forKey: profileDefaultProxyKey(old))
         if let i = profiles.firstIndex(of: old) { profiles[i] = new }
         d.set(profiles, forKey: "profiles")
         if activeProfile == old {
@@ -287,6 +326,8 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         d.removeObject(forKey: profileLoggingKey(name))
         d.removeObject(forKey: profileCloseKey(name))
         d.removeObject(forKey: profileStartupKey(name))
+        d.removeObject(forKey: profileDNSKey(name))
+        d.removeObject(forKey: profileDefaultProxyKey(name))
         profiles.removeAll { $0 == name }
         d.set(profiles, forKey: "profiles")
     }
@@ -304,6 +345,8 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
             "trafficLoggingEnabled": d.object(forKey: profileLoggingKey(name)) as? Bool ?? true,
             "closeToMenuBar": d.object(forKey: profileCloseKey(name)) as? Bool ?? false,
             "runAtStartup": d.object(forKey: profileStartupKey(name)) as? Bool ?? false,
+            "dnsEnabled": d.object(forKey: profileDNSKey(name)) as? Bool ?? true,
+            "defaultProxyId": d.string(forKey: profileDefaultProxyKey(name)) ?? NSNull(),
             "proxyConfigs": configsJSON,
             "proxyRules": d.array(forKey: profileRulesKey(name)) ?? []
         ]
@@ -331,6 +374,8 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         d.set(obj["trafficLoggingEnabled"] as? Bool ?? true, forKey: profileLoggingKey(name))
         d.set(obj["closeToMenuBar"] as? Bool ?? false, forKey: profileCloseKey(name))
         d.set(obj["runAtStartup"] as? Bool ?? false, forKey: profileStartupKey(name))
+        d.set(obj["dnsEnabled"] as? Bool ?? true, forKey: profileDNSKey(name))
+        if let id = obj["defaultProxyId"] as? String, !id.isEmpty { d.set(id, forKey: profileDefaultProxyKey(name)) } else { d.removeObject(forKey: profileDefaultProxyKey(name)) }
 
         profiles.append(name)
         d.set(profiles, forKey: "profiles")
@@ -356,6 +401,32 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         saveProxyConfigs()
         if let session = tunnelSession {
             sendProxyConfigsToExtension(session: session)
+            // the first proxy becomes the default, rules set to Default follow it
+            RuleManager.resyncRules(session: session) { _, _ in }
+        }
+    }
+
+    // MARK: - Default proxy
+
+    private func loadDefaultProxySetting() {
+        defaultProxyId = UserDefaults.standard.string(forKey: "defaultProxyId")
+    }
+
+    // the proxy rules set to "Default" use right now, nil when there is no proxy
+    var effectiveDefaultProxy: ProxyConfig? {
+        guard let id = DefaultProxy.effectiveId(defaultId: defaultProxyId, proxyIds: proxyConfigs.map { $0.id }) else { return nil }
+        return proxyConfigs.first { $0.id == id }
+    }
+
+    func setDefaultProxy(_ id: String) {
+        guard proxyConfigs.contains(where: { $0.id == id }) else { return }
+        // marking the proxy that is already the default (the first one) still saves the choice, so a
+        // later change in the list order does not move it
+        let changes = effectiveDefaultProxy?.id != id
+        defaultProxyId = id
+        UserDefaults.standard.set(id, forKey: "defaultProxyId")
+        if changes, let session = tunnelSession {
+            RuleManager.resyncRules(session: session) { _, _ in }
         }
     }
 
@@ -391,8 +462,14 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         }
         proxyConfigs.removeAll { $0.id == config.id }
         saveProxyConfigs()
+        if defaultProxyId == config.id {
+            // the next proxy takes over as the default
+            defaultProxyId = nil
+            UserDefaults.standard.removeObject(forKey: "defaultProxyId")
+        }
         if let session = tunnelSession {
             sendProxyConfigsToExtension(session: session)
+            RuleManager.resyncRules(session: session) { _, _ in }
         }
     }
     
@@ -455,22 +532,51 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
         }
     }
 
-    // enables the dns proxy provider so the extension can see dns resolutions and
-    // build the ip -> domain map used for domain rules
-    func startDNSProxy() {
+    // makes the system DNS proxy entry match the profile's Enable DNS setting. on: the extension sees
+    // the dns answers and can build the ip -> name map used by host name rules and "send hostname".
+    // off: the entry is switched off so macOS sends dns the normal way and another tool can use the
+    // one dns proxy slot macOS has. only our own entry is ever changed.
+    func applyDNSProxy() {
+        guard extensionReady else { return }
+        let enable = isDNSEnabled
         let manager = NEDNSProxyManager.shared()
-        manager.loadFromPreferences { [weak self] _ in
+        manager.loadFromPreferences { [weak self] loadError in
             guard let self = self else { return }
-            let proto = NEDNSProxyProviderProtocol()
-            proto.providerBundleIdentifier = self.extensionIdentifier
-            manager.providerProtocol = proto
-            manager.localizedDescription = "ProxyBridge DNS"
-            manager.isEnabled = true
-            manager.saveToPreferences { error in
-                if let error = error {
-                    self.addLog("ERROR", "DNS proxy setup failed: \(error.localizedDescription)")
-                } else {
-                    self.addLog("INFO", "DNS proxy enabled")
+            let ours = manager.providerProtocol?.providerBundleIdentifier == self.extensionIdentifier
+            if enable {
+                if loadError == nil, ours, manager.isEnabled {
+                    DispatchQueue.main.async { self.addLog("INFO", "DNS proxy enabled") }
+                    return
+                }
+                let proto = NEDNSProxyProviderProtocol()
+                proto.providerBundleIdentifier = self.extensionIdentifier
+                manager.providerProtocol = proto
+                manager.localizedDescription = "ProxyBridge DNS"
+                manager.isEnabled = true
+                manager.saveToPreferences { error in
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            self.addLog("ERROR", "DNS proxy setup failed: \(error.localizedDescription)")
+                        } else {
+                            self.addLog("INFO", "DNS proxy enabled")
+                        }
+                    }
+                }
+            } else {
+                let note = "DNS proxy is off (Enable DNS in the Proxy menu). Host name rules and send hostname do not work."
+                guard loadError == nil, ours, manager.isEnabled else {
+                    DispatchQueue.main.async { self.addLog("INFO", note) }
+                    return
+                }
+                manager.isEnabled = false
+                manager.saveToPreferences { error in
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            self.addLog("ERROR", "Could not switch the DNS proxy off: \(error.localizedDescription)")
+                        } else {
+                            self.addLog("INFO", note)
+                        }
+                    }
                 }
             }
         }
@@ -512,6 +618,7 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
             }
 
             do {
+                DispatchQueue.main.async { self.watchTunnelStart(session: session) }
                 try session.startTunnel()
                 DispatchQueue.main.async {
                     self.isProxyActive = true
@@ -520,7 +627,64 @@ class ProxyBridgeViewModel: NSObject, ObservableObject {
             } catch {
                 if let obs = observer { NotificationCenter.default.removeObserver(obs) }
                 observer = nil
+                DispatchQueue.main.async { self.tunnelStartPending = false }
                 self.addLog("ERROR", "Failed to start tunnel: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // a start that macOS stops again at once, or that never finishes, is reported with the reason macOS
+    // recorded. the first time, the saved network configuration is removed and created again, a bad one
+    // is the usual cause. the second time the user gets the steps to do by hand.
+    private func watchTunnelStart(session: NETunnelProviderSession) {
+        tunnelStartPending = true
+        tunnelWatchdog?.cancel()
+        if let old = tunnelFailureObserver { NotificationCenter.default.removeObserver(old) }
+        var sawConnecting = false
+        tunnelFailureObserver = NotificationCenter.default.addObserver(forName: .NEVPNStatusDidChange, object: session, queue: .main) { [weak self] _ in
+            guard let self = self, self.tunnelStartPending else { return }
+            switch session.status {
+            case .connecting:
+                sawConnecting = true
+            case .connected:
+                self.tunnelStartPending = false
+                self.tunnelWatchdog?.cancel()
+            case .disconnected, .invalid:
+                if sawConnecting { self.tunnelStartFailed(session: session, why: "The tunnel stopped before it was ready") }
+            default:
+                break
+            }
+        }
+        let watchdog = DispatchWorkItem { [weak self] in
+            guard let self = self, self.tunnelStartPending, session.status != .connected else { return }
+            self.tunnelStartFailed(session: session, why: "The tunnel did not start in 30 seconds")
+        }
+        tunnelWatchdog = watchdog
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: watchdog)
+    }
+
+    private func tunnelStartFailed(session: NETunnelProviderSession, why: String) {
+        guard tunnelStartPending else { return }
+        tunnelStartPending = false
+        tunnelWatchdog?.cancel()
+        isProxyActive = false
+        TunnelRepair.lastDisconnectReason(session) { [weak self] reason in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.addLog("ERROR", "\(why). macOS says: \(reason)")
+                if self.tunnelRepairTried {
+                    self.addLog("ERROR", "Remove the ProxyBridge entries in System Settings, Network, restart the Mac and open ProxyBridge again. If it still fails, report it with the output of: systemextensionsctl list")
+                    return
+                }
+                self.tunnelRepairTried = true
+                self.addLog("INFO", "Removing the saved network configuration and creating a new one. macOS may ask you to allow it again")
+                TunnelRepair.removeSavedConfigurations(extensionIdentifier: self.extensionIdentifier) { summary in
+                    DispatchQueue.main.async {
+                        self.addLog("INFO", summary)
+                        self.startProxy()
+                        self.applyDNSProxy()
+                    }
+                }
             }
         }
     }
@@ -737,8 +901,9 @@ extension ProxyBridgeViewModel: OSSystemExtensionRequestDelegate {
     func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
         DispatchQueue.main.async {
             self.addLog("INFO", "Extension installed successfully")
+            self.extensionReady = true
             self.startProxy()
-            self.startDNSProxy()
+            self.applyDNSProxy()
         }
     }
     

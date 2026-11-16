@@ -281,9 +281,17 @@ extension ProxyRule {
     struct FlowProcess {
         let candidates: [(path: [Character], file: [Character])]
 
-        init(bundleId: String, processName: String?) {
+        // the names a rule can match: the bundle identifier, and the program itself. when the full path of
+        // the program is known a rule written with a path (/opt/tool/bin/worker, /Applications/Foo.app/*)
+        // is compared with it, and a rule written with a file name with its last part. without the path
+        // only the file name is known and a rule with a path cannot match (issue #288).
+        init(bundleId: String, processName: String?, executablePath: String? = nil) {
             var list = [bundleId]
-            if let processName = processName { list.append(processName) }
+            if let executablePath = executablePath {
+                list.append(executablePath)
+            } else if let processName = processName {
+                list.append(processName)
+            }
             candidates = list.map {
                 (Array($0.lowercased()), Array((($0 as NSString).lastPathComponent).lowercased()))
             }
@@ -415,11 +423,15 @@ class AppProxyProvider: NETransparentProxyProvider {
     // cache by pid + pid version so we don't call proc_pidpath on every
     // connection. the version changes when a pid is reused, so a new process
     // never inherits the previous owner's name
-    private var pidCache: [UInt64: String] = [:]
+    private struct ProcessIdentity {
+        let name: String   // file name of the executable, what the logs show
+        let path: String   // full path of the executable, what a rule with a path is compared with
+    }
+    private var pidCache: [UInt64: ProcessIdentity] = [:]
     private let pidCacheLock = NSLock()
     private static let pidCacheMaxSize = 256
     
-    private func getProcessName(from metaData: NEFlowMetaData) -> String? {
+    private func getProcessIdentity(from metaData: NEFlowMetaData) -> ProcessIdentity? {
         guard let auditTokenData = metaData.sourceAppAuditToken else {
             return nil
         }
@@ -449,17 +461,17 @@ class AppProxyProvider: NETransparentProxyProvider {
         }
         
         let fullPath = String(cString: pathBuffer)
-        let processName = (fullPath as NSString).lastPathComponent
+        let identity = ProcessIdentity(name: (fullPath as NSString).lastPathComponent, path: fullPath)
         
         // store in cache, evict everything if full - processes rarely hit this
         pidCacheLock.lock()
         if pidCache.count >= AppProxyProvider.pidCacheMaxSize {
             pidCache.removeAll(keepingCapacity: true)
         }
-        pidCache[key] = processName
+        pidCache[key] = identity
         pidCacheLock.unlock()
         
-        return processName
+        return identity
     }
     
     // guarded by its own lock, the old OSAtomic compare-and-swap setter could
@@ -500,6 +512,13 @@ class AppProxyProvider: NETransparentProxyProvider {
         appendLog(.activity(timestamp: dateFormatter.string(from: Date()), level: level, message: message))
     }
 
+    // the extension's own life cycle: to the unified log, which survives the extension, and to the
+    // activity log, which the app shows while it is connected
+    private func diag(_ message: String, level: String = "INFO") {
+        ProviderDiagnostics.note(message, error: level == "ERROR")
+        log(message, level: level)
+    }
+
     private func appendLog(_ entry: LogEntry) {
         logQueueLock.lock()
         logBuffer[logTail] = entry
@@ -528,13 +547,20 @@ class AppProxyProvider: NETransparentProxyProvider {
         settings.includedNetworkRules = [allTrafficRule]
 
         startUDPSweepTimer()
-        
-        self.setTunnelNetworkSettings(settings) { error in
+        diag("Tunnel starting")
+
+        self.setTunnelNetworkSettings(settings) { [weak self] error in
+            if let error = error {
+                self?.diag("Could not apply the tunnel network settings: \(error.localizedDescription)", level: "ERROR")
+            } else {
+                self?.diag("Tunnel started")
+            }
             completionHandler(error)
         }
     }
     
     override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        diag("Tunnel stopping: \(ProviderDiagnostics.text(for: reason))")
         udpSweepTimer?.cancel()
         udpSweepTimer = nil
         sweepHandshakes(all: true)
@@ -651,8 +677,10 @@ class AppProxyProvider: NETransparentProxyProvider {
         handshakeLock.unlock()
         for (_, entry) in expired {
             entry.connection.cancel()
-            entry.flow.closeReadWithError(nil)
-            entry.flow.closeWriteWithError(nil)
+            // a tcp flow must fail its connect (see FlowFailure), udp flows keep the clean close
+            let reason: Error? = entry.flow is NEAppProxyTCPFlow ? FlowFailure.timedOut : nil
+            entry.flow.closeReadWithError(reason)
+            entry.flow.closeWriteWithError(reason)
         }
     }
 
@@ -831,7 +859,8 @@ class AppProxyProvider: NETransparentProxyProvider {
             portStr = "unknown"
         }
         
-        let processName = getProcessName(from: metaData)
+        let identity = getProcessIdentity(from: metaData)
+        let processName = identity?.name
         let displayName = processName ?? processPath
         
         // domains that resolved to this ip (from the dns proxy), used for domain
@@ -842,7 +871,7 @@ class AppProxyProvider: NETransparentProxyProvider {
         // rules are always evaluated. a proxy config is only needed by a rule that
         // routes to one, BLOCK and DIRECT rules work without any (they used to be
         // skipped whenever no proxy was configured, so a lone BLOCK rule did nothing)
-        let matchedRule = findMatchingRule(bundleId: processPath, processName: processName, destination: destination, port: portNum, connectionProtocol: .tcp, checkIpPort: true, domains: domains)
+        let matchedRule = findMatchingRule(bundleId: processPath, processName: processName, executablePath: identity?.path, destination: destination, port: portNum, connectionProtocol: .tcp, checkIpPort: true, domains: domains)
 
         if let rule = matchedRule {
             switch rule.action {
@@ -883,7 +912,8 @@ class AppProxyProvider: NETransparentProxyProvider {
     private func handleUDPFlow(_ flow: NEAppProxyUDPFlow) -> Bool {
         let metaData = flow.metaData
         let processPath = metaData.sourceAppSigningIdentifier
-        let processName = getProcessName(from: metaData)
+        let identity = getProcessIdentity(from: metaData)
+        let processName = identity?.name
         let displayName = processName ?? processPath
         
         if processPath == "com.interceptsuite.ProxyBridge" || processPath == "com.interceptsuite.ProxyBridge.extension" {
@@ -896,7 +926,7 @@ class AppProxyProvider: NETransparentProxyProvider {
         let hasAnySocks5 = storedProxyConfigs.values.contains { $0.type.lowercased() == "socks5" }
         proxyLock.unlock()
 
-        let matchedRule = findMatchingRule(bundleId: processPath, processName: processName, destination: "", port: 0, connectionProtocol: .udp, checkIpPort: false)
+        let matchedRule = findMatchingRule(bundleId: processPath, processName: processName, executablePath: identity?.path, destination: "", port: 0, connectionProtocol: .udp, checkIpPort: false)
 
         if let rule = matchedRule {
             let action = rule.action
@@ -1446,8 +1476,8 @@ class AppProxyProvider: NETransparentProxyProvider {
             handleHTTPProxy(clientFlow: flow, proxyConnection: proxyConnection, destination: destination, port: port, username: config.username, password: config.password)
         default:
             log("unsupported proxy type: \(config.type)", level: "ERROR")
-            flow.closeReadWithError(nil)
-            flow.closeWriteWithError(nil)
+            flow.closeReadWithError(FlowFailure.refused)
+            flow.closeWriteWithError(FlowFailure.refused)
         }
     }
     
@@ -1463,8 +1493,8 @@ class AppProxyProvider: NETransparentProxyProvider {
         proxyConnection.write(greetingData) { [weak self] error in
             if let error = error {
                 self?.log("SOCKS5 greeting write failed: \(error.localizedDescription)", level: "ERROR")
-                clientFlow.closeReadWithError(error)
-                clientFlow.closeWriteWithError(error)
+                clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                 proxyConnection.cancel()
                 return
             }
@@ -1474,16 +1504,16 @@ class AppProxyProvider: NETransparentProxyProvider {
                 
                 if let error = error {
                     self.log("SOCKS5 greeting response failed: \(error.localizedDescription)", level: "ERROR")
-                    clientFlow.closeReadWithError(error)
-                    clientFlow.closeWriteWithError(error)
+                    clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                    clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                     proxyConnection.cancel()
                     return
                 }
                 
                 guard let data = data, data.count == 2 else {
                     self.log("SOCKS5 invalid greeting response", level: "ERROR")
-                    clientFlow.closeReadWithError(nil)
-                    clientFlow.closeWriteWithError(nil)
+                    clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                    clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                     proxyConnection.cancel()
                     return
                 }
@@ -1493,8 +1523,8 @@ class AppProxyProvider: NETransparentProxyProvider {
                 
                 if version != 0x05 {
                     self.log("SOCKS5 invalid version: \(version)", level: "ERROR")
-                    clientFlow.closeReadWithError(nil)
-                    clientFlow.closeWriteWithError(nil)
+                    clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                    clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                     proxyConnection.cancel()
                     return
                 }
@@ -1505,8 +1535,8 @@ class AppProxyProvider: NETransparentProxyProvider {
                     self.sendSOCKS5Auth(clientFlow: clientFlow, proxyConnection: proxyConnection, destination: destination, port: port, username: username ?? "", password: password ?? "")
                 } else {
                     self.log("SOCKS5 no acceptable auth method: \(method)", level: "ERROR")
-                    clientFlow.closeReadWithError(nil)
-                    clientFlow.closeWriteWithError(nil)
+                    clientFlow.closeReadWithError(FlowFailure.refused)
+                    clientFlow.closeWriteWithError(FlowFailure.refused)
                     proxyConnection.cancel()
                 }
             }
@@ -1517,7 +1547,7 @@ class AppProxyProvider: NETransparentProxyProvider {
         let user = Array(username.utf8), pass = Array(password.utf8)
         guard user.count <= 255, pass.count <= 255 else {
             log("SOCKS5 credentials too long", level: "ERROR")
-            closeRelay(clientFlow, proxyConnection)
+            closeRelay(clientFlow, proxyConnection, error: FlowFailure.refused)
             return
         }
         var authData = Data()
@@ -1530,8 +1560,8 @@ class AppProxyProvider: NETransparentProxyProvider {
         proxyConnection.write(authData) { [weak self] error in
             if let error = error {
                 self?.log("SOCKS5 auth write failed: \(error.localizedDescription)", level: "ERROR")
-                clientFlow.closeReadWithError(error)
-                clientFlow.closeWriteWithError(error)
+                clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                 proxyConnection.cancel()
                 return
             }
@@ -1541,16 +1571,16 @@ class AppProxyProvider: NETransparentProxyProvider {
                 
                 if let error = error {
                     self.log("SOCKS5 auth response failed: \(error.localizedDescription)", level: "ERROR")
-                    clientFlow.closeReadWithError(error)
-                    clientFlow.closeWriteWithError(error)
+                    clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                    clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                     proxyConnection.cancel()
                     return
                 }
                 
                 guard let data = data, data.count == 2, data[1] == 0x00 else {
                     self.log("SOCKS5 auth failed", level: "ERROR")
-                    clientFlow.closeReadWithError(nil)
-                    clientFlow.closeWriteWithError(nil)
+                    clientFlow.closeReadWithError(FlowFailure.refused)
+                    clientFlow.closeWriteWithError(FlowFailure.refused)
                     proxyConnection.cancel()
                     return
                 }
@@ -1576,7 +1606,7 @@ class AppProxyProvider: NETransparentProxyProvider {
             let hostBytes = Array(destination.utf8)
             guard hostBytes.count <= 255 else {
                 log("SOCKS5 destination name too long", level: "ERROR")
-                closeRelay(clientFlow, proxyConnection)
+                closeRelay(clientFlow, proxyConnection, error: FlowFailure.refused)
                 return
             }
             request.append(0x03)
@@ -1590,8 +1620,8 @@ class AppProxyProvider: NETransparentProxyProvider {
         proxyConnection.write(request) { [weak self] error in
             if let error = error {
                 self?.log("SOCKS5 connect write failed: \(error.localizedDescription)", level: "ERROR")
-                clientFlow.closeReadWithError(error)
-                clientFlow.closeWriteWithError(error)
+                clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                 proxyConnection.cancel()
                 return
             }
@@ -1603,10 +1633,10 @@ class AppProxyProvider: NETransparentProxyProvider {
                     self.relayData(clientFlow: clientFlow, proxyConnection: proxyConnection)
                 case .rejected(let rep):
                     self.log("SOCKS5 connect rejected, REP=0x\(String(format: "%02x", rep)) (\(self.socksReplyReason(rep)))", level: "ERROR")
-                    self.closeRelay(clientFlow, proxyConnection)
+                    self.closeRelay(clientFlow, proxyConnection, error: FlowFailure.socks(rep))
                 case .failed(let reason):
                     self.log("SOCKS5 connect failed: \(reason)", level: "ERROR")
-                    self.closeRelay(clientFlow, proxyConnection)
+                    self.closeRelay(clientFlow, proxyConnection, error: FlowFailure.proxyUnreachable)
                 }
             }
         }
@@ -1630,8 +1660,8 @@ class AppProxyProvider: NETransparentProxyProvider {
         
         guard let requestData = request.data(using: .utf8) else {
             log("HTTP CONNECT request encoding failed", level: "ERROR")
-            clientFlow.closeReadWithError(nil)
-            clientFlow.closeWriteWithError(nil)
+            clientFlow.closeReadWithError(FlowFailure.refused)
+            clientFlow.closeWriteWithError(FlowFailure.refused)
             proxyConnection.cancel()
             return
         }
@@ -1639,8 +1669,8 @@ class AppProxyProvider: NETransparentProxyProvider {
         proxyConnection.write(requestData) { [weak self] error in
             if let error = error {
                 self?.log("HTTP CONNECT write failed: \(error.localizedDescription)", level: "ERROR")
-                clientFlow.closeReadWithError(error)
-                clientFlow.closeWriteWithError(error)
+                clientFlow.closeReadWithError(FlowFailure.proxyUnreachable)
+                clientFlow.closeWriteWithError(FlowFailure.proxyUnreachable)
                 proxyConnection.cancel()
                 return
             }
@@ -1653,7 +1683,7 @@ class AppProxyProvider: NETransparentProxyProvider {
                     self.relayData(clientFlow: clientFlow, proxyConnection: proxyConnection, initialData: leftover)
                 } else {
                     self.log("HTTP CONNECT failed: \(detail)", level: "ERROR")
-                    self.closeRelay(clientFlow, proxyConnection)
+                    self.closeRelay(clientFlow, proxyConnection, error: FlowFailure.http(status))
                 }
             }
         }
@@ -1750,13 +1780,13 @@ class AppProxyProvider: NETransparentProxyProvider {
         }
     }
     
-    private func findMatchingRule(bundleId: String, processName: String?, destination: String, port: UInt16, connectionProtocol: RuleProtocol, checkIpPort: Bool, domains: [String] = []) -> ProxyRule? {
+    private func findMatchingRule(bundleId: String, processName: String?, executablePath: String? = nil, destination: String, port: UInt16, connectionProtocol: RuleProtocol, checkIpPort: Bool, domains: [String] = []) -> ProxyRule? {
         rulesLock.lock()
         let currentRules = rules
         rulesLock.unlock()
         if currentRules.isEmpty { return nil }
 
-        let flowProcess = ProxyRule.FlowProcess(bundleId: bundleId, processName: processName)
+        let flowProcess = ProxyRule.FlowProcess(bundleId: bundleId, processName: processName, executablePath: executablePath)
         let domainChars = domains.map { (name: $0, chars: Array($0)) }
 
         var wildcardRule: ProxyRule? = nil

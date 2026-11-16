@@ -154,6 +154,10 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
     private var extensionActive = false
     private var started = false
     private var stopping = false
+    // a tunnel start that macOS stops again at once (#282) is retried once with a fresh configuration
+    private var startAttempt = 0
+    private var startFailureHandled = false
+    private var repairTried = false
     private let clock: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss"
@@ -190,6 +194,10 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
             }
             self.extensionActive = true
             CLI.say("Extension: active")
+            // the DNS entry is set up now, not after the tunnel is up. when the tunnel never starts, a DNS
+            // proxy that was meant to be off must not stay on
+            CLI.say(self.profile.dnsEnabled ? "DNS proxy: on" : "DNS proxy: off (host name rules and send hostname do not work)")
+            self.applyDNSProxy()
             self.configureTunnel()
         }
     }
@@ -240,6 +248,11 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
         self.manager = manager
         guard let session = manager.connection as? NETunnelProviderSession else { fail("The tunnel session is not available."); return }
         self.session = session
+        if let old = statusObserver { NotificationCenter.default.removeObserver(old) }
+        startAttempt += 1
+        let attempt = startAttempt
+        startFailureHandled = false
+        var sawConnecting = false
 
         // watch the tunnel for as long as we run: it connects once, and if something else stops it
         // later (the app being opened, the extension crashing) nothing is redirected any more and
@@ -247,11 +260,15 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
         statusObserver = NotificationCenter.default.addObserver(forName: .NEVPNStatusDidChange, object: session, queue: .main) { [weak self] _ in
             guard let self = self else { return }
             switch session.status {
+            case .connecting:
+                sawConnecting = true
             case .connected:
                 if !self.started { self.applyProfile() }
             case .disconnected, .invalid:
                 if self.started && !self.stopping {
                     self.fail("The tunnel was stopped by something else (is the ProxyBridge app running?). Nothing is being redirected any more.")
+                } else if !self.started && sawConnecting {
+                    self.startFailed(attempt: attempt, why: "The tunnel stopped before it was ready")
                 }
             default: break
             }
@@ -260,7 +277,32 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
         if session.status == .connected { applyProfile(); return }
         do { try session.startTunnel() } catch { fail("Could not start the tunnel: \(error.localizedDescription)"); return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
-            if let self = self, !self.started { self.fail("The tunnel did not start in 30 seconds.") }
+            self?.startFailed(attempt: attempt, why: "The tunnel did not start in 30 seconds")
+        }
+    }
+
+    // the tunnel did not come up. say why (macOS keeps the reason of the last stop), then remove the saved
+    // network configuration and try once more with a fresh one. a bad saved configuration is the usual cause.
+    private func startFailed(attempt: Int, why: String) {
+        guard attempt == startAttempt, !started, !stopping, !startFailureHandled, let session = session else { return }
+        startFailureHandled = true
+        TunnelRepair.lastDisconnectReason(session) { reason in
+            DispatchQueue.main.async {
+                CLI.warn("\(why). macOS says: \(CLIText.safe(reason))")
+                if self.repairTried {
+                    self.fail("The tunnel still does not start. Remove the ProxyBridge entries in System Settings, Network, restart the Mac and run the command again. If it keeps failing, report it with the output of: systemextensionsctl list")
+                    return
+                }
+                self.repairTried = true
+                CLI.say("Removing the saved network configuration and creating a new one. macOS may ask you to allow it again.")
+                TunnelRepair.removeSavedConfigurations(extensionIdentifier: CLI.extensionIdentifier) { summary in
+                    DispatchQueue.main.async {
+                        CLI.say(CLIText.safe(summary))
+                        self.applyDNSProxy()
+                        self.configureTunnel()
+                    }
+                }
+            }
         }
     }
 
@@ -269,12 +311,18 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
     private func applyProfile() {
         guard !started, !stopping, let session = session else { return }
         started = true
-        enableDNSProxy()
 
         // same messages, same order as the GUI: logging, proxies, then the rules in one step
         send(["action": "setTrafficLogging", "enabled": verbose >= 2]) { _ in
             self.send(["action": "setProxyConfigs", "configs": self.proxyMessages()]) { _ in
-                RuleManager.applyRules(session: session, rules: self.profile.rules) { _, count in
+                let proxyIds = self.profile.proxies.map { $0.id }
+                if DefaultProxy.usesDefault(self.profile.rules) {
+                    let chosen = DefaultProxy.effectiveId(defaultId: self.profile.defaultProxyId, proxyIds: proxyIds)
+                    let label = self.profile.proxies.first { $0.id == chosen }?.label ?? "none, those rules go direct"
+                    CLI.say("Default proxy: \(CLIText.safe(label))")
+                }
+                let defaultAction = DefaultProxy.effectiveAction(defaultId: self.profile.defaultProxyId, proxyIds: proxyIds)
+                RuleManager.applyRules(session: session, rules: self.profile.rules, defaultAction: defaultAction) { _, count in
                     CLI.say("Profile \"\(CLIText.safe(self.profile.name))\": \(self.profile.proxies.count) proxies, \(count) rules applied")
                     // the extension skips a rule it can't read, don't let that pass silently
                     if count < self.profile.rules.count { CLI.warn("\(self.profile.rules.count - count) rule(s) were rejected by the extension (invalid fields)") }
@@ -294,13 +342,24 @@ final class CLIRunner: NSObject, OSSystemExtensionRequestDelegate {
         }
     }
 
-    // the DNS provider is what makes domain rules and hostnames work, the GUI turns it on too.
-    // when it is already set up for this extension it is left alone, saving it again on every
-    // start is a needless system configuration change
-    private func enableDNSProxy() {
+    // the DNS provider is what makes domain rules and hostnames work, the GUI turns it on too, and
+    // the profile's Enable DNS setting decides. when the entry is already in the wanted state it is
+    // left alone, saving it again on every start is a needless system configuration change. only our
+    // own entry is ever switched off.
+    private func applyDNSProxy() {
         let dns = NEDNSProxyManager.shared()
+        let wanted = profile.dnsEnabled
         dns.loadFromPreferences { loadError in
-            if loadError == nil, dns.isEnabled, dns.providerProtocol?.providerBundleIdentifier == CLI.extensionIdentifier { return }
+            let ours = dns.providerProtocol?.providerBundleIdentifier == CLI.extensionIdentifier
+            if !wanted {
+                guard loadError == nil, ours, dns.isEnabled else { return }
+                dns.isEnabled = false
+                dns.saveToPreferences { error in
+                    if let error = error { CLI.warn("Could not switch the DNS proxy off: \(error.localizedDescription)") }
+                }
+                return
+            }
+            if loadError == nil, dns.isEnabled, ours { return }
             let proto = NEDNSProxyProviderProtocol()
             proto.providerBundleIdentifier = CLI.extensionIdentifier
             dns.providerProtocol = proto
