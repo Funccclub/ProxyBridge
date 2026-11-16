@@ -283,6 +283,7 @@ struct ProxyRulesView: View {
         switch action {
         case "BLOCK": return .red
         case "DIRECT": return .blue
+        case DefaultProxy.action: return viewModel.effectiveDefaultProxy == nil ? .blue : .green
         default: return .green  // any proxy config UUID
         }
     }
@@ -290,6 +291,9 @@ struct ProxyRulesView: View {
     private func actionDisplayName(_ action: String) -> String {
         switch action {
         case "DIRECT", "BLOCK": return action
+        case DefaultProxy.action:
+            if let proxy = viewModel.effectiveDefaultProxy { return "Default (\(proxy.displayName))" }
+            return "Default (no proxy, goes DIRECT)"
         default:
             return viewModel.proxyConfigs.first(where: { $0.id == action })?.displayName ?? action
         }
@@ -412,8 +416,8 @@ struct RuleEditorView: View {
         _targetHosts = State(initialValue: existingRule?.targetHosts ?? "*")
         _targetPorts = State(initialValue: existingRule?.targetPorts ?? "*")
         _selectedProtocol = State(initialValue: existingRule?.ruleProtocol ?? "TCP")
-        // default to first proxy config if there is one, otherwise direct
-        let defaultAction = existingRule?.action ?? viewModel.proxyConfigs.first?.id ?? "DIRECT"
+        // a new rule follows the default proxy when there is a proxy, otherwise it is direct
+        let defaultAction = existingRule?.action ?? (viewModel.proxyConfigs.isEmpty ? "DIRECT" : DefaultProxy.action)
         _selectedAction = State(initialValue: defaultAction)
     }
 
@@ -445,6 +449,14 @@ struct RuleEditorView: View {
                         text: $targetHosts,
                         hint: "IP: 127.0.0.1; 192.168.1.*; 10.0.0.1-10.0.0.254; ::1   Domain: github.com; *.github.com; *google*"
                     )
+                    HStack(spacing: 4) {
+                        Image(systemName: viewModel.isDNSEnabled ? "info.circle" : "exclamationmark.triangle.fill")
+                            .foregroundColor(viewModel.isDNSEnabled ? .secondary : .orange)
+                        Text(viewModel.isDNSEnabled
+                             ? "Host names only match when Enable DNS is on in the Proxy menu. IP addresses always work."
+                             : "Enable DNS is off in the Proxy menu, so host names do not match. IP addresses still work.")
+                            .font(.caption).foregroundColor(.secondary)
+                    }
                     
                     formField(
                         label: "Target ports",
@@ -485,6 +497,8 @@ struct RuleEditorView: View {
                             Text("BLOCK").tag("BLOCK")
                             if !viewModel.proxyConfigs.isEmpty {
                                 Divider()
+                                Text("Default (\(viewModel.effectiveDefaultProxy?.displayName ?? "no proxy"))").tag(DefaultProxy.action)
+                                Divider()
                                 ForEach(viewModel.proxyConfigs) { config in
                                     Text(config.displayName).tag(config.id)
                                 }
@@ -492,7 +506,8 @@ struct RuleEditorView: View {
                         }
                         .pickerStyle(.menu)
                         if selectedProtocol == "UDP" || selectedProtocol == "BOTH" {
-                            let isHttp = viewModel.proxyConfigs.first(where: { $0.id == selectedAction })?.type.lowercased() == "http"
+                            let chosenId = selectedAction == DefaultProxy.action ? viewModel.effectiveDefaultProxy?.id : selectedAction
+                            let isHttp = viewModel.proxyConfigs.first(where: { $0.id == chosenId })?.type.lowercased() == "http"
                             if isHttp {
                                 HStack(spacing: 4) {
                                     Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.yellow)

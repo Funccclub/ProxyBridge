@@ -118,6 +118,75 @@ t("too many rules is an error", CLIProfileLoader.errors(for: profile(rules: Arra
 t("exactly the maximum number of rules is fine", CLIProfileLoader.errors(for: profile(rules: Array(repeating: ["action": "BLOCK"], count: CLIProfileLoader.maxRules))).isEmpty)
 t("too many proxies is an error", CLIProfileLoader.errors(for: profile(proxies: (0...CLIProfileLoader.maxProxies).map { ["id": "p\($0)", "type": "http", "host": "h", "port": 1] })).contains { $0.contains("limit") })
 
+// ---- Enable DNS (per profile)
+func jsonProfile(_ extra: String) -> Data { Data("{\"proxyConfigs\": [], \"proxyRules\": []\(extra)}".utf8) }
+t("DNS is on when the profile has no setting", (try? CLIProfileLoader.parse(json: jsonProfile("")))?.dnsEnabled == true)
+t("dnsEnabled false in a file turns DNS off", (try? CLIProfileLoader.parse(json: jsonProfile(", \"dnsEnabled\": false")))?.dnsEnabled == false)
+t("dnsEnabled true in a file keeps DNS on", (try? CLIProfileLoader.parse(json: jsonProfile(", \"dnsEnabled\": true")))?.dnsEnabled == true)
+t("a wrong type for dnsEnabled means on", (try? CLIProfileLoader.parse(json: jsonProfile(", \"dnsEnabled\": \"no\"")))?.dnsEnabled == true)
+let dnsStore: [String: Any] = ["profiles": ["Default", "work", "legacy"], "activeProfile": "Default",
+                               "dnsEnabled": false, "profile.work.dnsEnabled": true, "profile.legacy.proxyRules": [[String: Any]]()]
+let dnsRead: CLIProfileLoader.Reader = { dnsStore[$0] }
+t("the active saved profile reads the working key", (try? CLIProfileLoader.saved(named: "Default", read: dnsRead))?.dnsEnabled == false)
+t("another saved profile reads its own key", (try? CLIProfileLoader.saved(named: "work", read: dnsRead))?.dnsEnabled == true)
+t("a saved profile without the key has DNS on", (try? CLIProfileLoader.saved(named: "legacy", read: dnsRead))?.dnsEnabled == true)
+t("hasHostName: a domain", CLIProfileLoader.hasHostName("github.com"))
+t("hasHostName: a wildcard domain", CLIProfileLoader.hasHostName("*.github.com"))
+t("hasHostName: a domain among IPs", CLIProfileLoader.hasHostName("10.*.*.*; example.org"))
+t("hasHostName: an IPv4 address is not a name", !CLIProfileLoader.hasHostName("192.168.1.1"))
+t("hasHostName: a range is not a name", !CLIProfileLoader.hasHostName("10.0.0.1-10.0.0.254"))
+t("hasHostName: IPv6 is not a name", !CLIProfileLoader.hasHostName("2001:db8::1; fe80::1-fe80::ff"))
+t("hasHostName: star and empty are not names", !CLIProfileLoader.hasHostName("*") && !CLIProfileLoader.hasHostName(""))
+var noDNS = profile(rules: [["processNames": "*", "targetHosts": "github.com", "protocol": "TCP", "action": "DIRECT"],
+                            ["processNames": "*", "targetHosts": "10.*.*.*", "protocol": "TCP", "action": "DIRECT"]])
+noDNS.dnsEnabled = false
+t("a host name rule with DNS off is warned about", CLIProfileLoader.warnings(for: noDNS).contains { $0.contains("rule 1") && $0.contains("DNS is off") })
+t("an IP rule with DNS off is not warned about", !CLIProfileLoader.warnings(for: noDNS).contains { $0.contains("rule 2") })
+noDNS.dnsEnabled = true
+t("a host name rule with DNS on is not warned about", !CLIProfileLoader.warnings(for: noDNS).contains { $0.contains("DNS is off") })
+
+// ---- default proxy (issue #274)
+t("effective default: the marked proxy", DefaultProxy.effectiveAction(defaultId: "b", proxyIds: ["a", "b"]) == "b")
+t("effective default: nothing marked means the first proxy", DefaultProxy.effectiveAction(defaultId: nil, proxyIds: ["a", "b"]) == "a")
+t("effective default: a marked proxy that is gone means the first proxy", DefaultProxy.effectiveAction(defaultId: "x", proxyIds: ["a", "b"]) == "a")
+t("effective default: no proxy at all means DIRECT", DefaultProxy.effectiveAction(defaultId: "b", proxyIds: []) == "DIRECT")
+t("effective id is nil without a proxy", DefaultProxy.effectiveId(defaultId: nil, proxyIds: []) == nil)
+t("effective id is the proxy id", DefaultProxy.effectiveId(defaultId: "b", proxyIds: ["a", "b"]) == "b")
+let mixed: [[String: Any]] = [["action": "DEFAULT", "processNames": "curl"], ["action": "pinned", "processNames": "nc"], ["action": "BLOCK"], ["action": "DIRECT"]]
+let resolved = DefaultProxy.resolve(mixed, to: "p1")
+t("a Default rule gets the proxy id", resolved[0]["action"] as? String == "p1")
+t("a pinned rule is left alone", resolved[1]["action"] as? String == "pinned")
+t("BLOCK and DIRECT are left alone", resolved[2]["action"] as? String == "BLOCK" && resolved[3]["action"] as? String == "DIRECT")
+t("the other fields of a Default rule are kept", resolved[0]["processNames"] as? String == "curl")
+t("Default resolves to DIRECT when there is no proxy", DefaultProxy.resolve(mixed, to: "DIRECT")[0]["action"] as? String == "DIRECT")
+t("the saved rules are not changed by resolving", mixed[0]["action"] as? String == "DEFAULT")
+t("usesDefault finds a Default rule", DefaultProxy.usesDefault(mixed))
+t("usesDefault is false without one", !DefaultProxy.usesDefault([["action": "BLOCK"], ["action": "p1"]]))
+t("a rule without an action is not a Default rule", !DefaultProxy.usesDefault([["processNames": "x"]]))
+t("DEFAULT, DIRECT and BLOCK are reserved", DefaultProxy.reservedActions == ["DEFAULT", "DIRECT", "BLOCK"])
+
+func jsonWith(_ extra: String) -> Data { Data("{\"proxyConfigs\": [], \"proxyRules\": []\(extra)}".utf8) }
+t("a file without defaultProxyId has none", (try? CLIProfileLoader.parse(json: jsonWith("")))?.defaultProxyId == nil)
+t("defaultProxyId is read from a file", (try? CLIProfileLoader.parse(json: jsonWith(", \"defaultProxyId\": \"b\"")))?.defaultProxyId == "b")
+t("a wrong type for defaultProxyId means none", (try? CLIProfileLoader.parse(json: jsonWith(", \"defaultProxyId\": 5")))?.defaultProxyId == nil)
+let defStore: [String: Any] = ["profiles": ["Default", "work"], "activeProfile": "Default",
+                               "defaultProxyId": "p-active", "profile.work.defaultProxyId": "p-work"]
+let defRead: CLIProfileLoader.Reader = { defStore[$0] }
+t("the active saved profile reads the working key", (try? CLIProfileLoader.saved(named: "Default", read: defRead))?.defaultProxyId == "p-active")
+t("another saved profile reads its own key", (try? CLIProfileLoader.saved(named: "work", read: defRead))?.defaultProxyId == "p-work")
+
+let two: [[String: Any]] = [["id": "a", "type": "socks5", "host": "h", "port": 1], ["id": "b", "type": "http", "host": "h2", "port": 2]]
+var withDefault = profile(proxies: two, rules: [["processNames": "curl", "protocol": "TCP", "action": "DEFAULT"]])
+t("a Default rule is not warned about", !CLIProfileLoader.warnings(for: withDefault).contains { $0.contains("not in this profile") })
+withDefault.defaultProxyId = "b"
+t("a valid defaultProxyId gives no warning", CLIProfileLoader.warnings(for: withDefault).isEmpty)
+withDefault.defaultProxyId = "zzz"
+t("an unknown defaultProxyId is warned about", CLIProfileLoader.warnings(for: withDefault).contains { $0.contains("zzz") })
+let noProxy = profile(rules: [["processNames": "curl", "protocol": "TCP", "action": "DEFAULT"]])
+t("a Default rule without any proxy is warned about", CLIProfileLoader.warnings(for: noProxy).contains { $0.contains("no proxy") })
+t("a proxy cannot have the id DEFAULT", CLIProfileLoader.errors(for: profile(proxies: [["id": "DEFAULT", "type": "http", "host": "h", "port": 1]])).contains { $0.contains("cannot be a proxy id") })
+t("a proxy cannot have the id BLOCK", CLIProfileLoader.errors(for: profile(proxies: [["id": "BLOCK", "type": "http", "host": "h", "port": 1]])).contains { $0.contains("cannot be a proxy id") })
+
 // ---- terminal safety
 t("plain text is unchanged", CLIText.safe("curl -> example.com:443") == "curl -> example.com:443")
 t("unicode is unchanged", CLIText.safe("caf\u{e9} \u{1F600} \u{4E2D}") == "caf\u{e9} \u{1F600} \u{4E2D}")
